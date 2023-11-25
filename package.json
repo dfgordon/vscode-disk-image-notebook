@@ -1,0 +1,66 @@
+{
+	"name": "vscode-disk-image-notebook",
+	"publisher": "dfgordon",
+	"displayName": "Disk Image Notebook",
+	"description": "Look inside disk images",
+	"icon": "disk-image-icon.png",
+	"version": "0.0.0",
+	"engines": {
+		"vscode": "^1.75.0"
+	},
+	"repository": {
+		"url": "https://github.com/dfgordon/vscode-disk-image-notebook"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onNotebook:disk-image-notebook"
+	],
+	"main": "./out/extension.js",
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
+	"contributes": {
+		"notebooks": [
+			{
+				"type": "disk-image-notebook",
+				"displayName": "Disk Image Notebook",
+				"priority": "default",
+				"selector": [
+					{
+						"filenamePattern": "*.{2mg,dsk,d13,do,po,img,ima,imd,nib,td0,woz}"
+					}
+				]
+			}
+		]
+	},
+	"scripts": {
+		"reset": "run-script-os",
+		"reset:windows": "npx rimraf .\\out && mkdir .\\out",
+		"reset:default": "npx rimraf ./out && mkdir ./out",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"test-compile": "npm run reset && tsc -p ./",
+		"test": "node ./out/test/runTest.js",
+		"esbuild-wrp": "npm run reset && esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+		"vscode:prepublish": "npm run esbuild-wrp -- --minify",
+		"build": "npm run esbuild-wrp -- --sourcemap"
+	},
+	"devDependencies": {
+		"@types/glob": "^8.1.0",
+		"@types/mocha": "^10.0.4",
+		"@types/node": "^13.11.0",
+		"@types/vscode": "1.60",
+		"esbuild": "^0.19.6",
+		"glob": "^8.1.0",
+		"mocha": "^10.0.4",
+		"rimraf": "^5.0.1",
+		"run-script-os": "^1.1.6",
+		"typescript": "^5.2.2",
+		"vscode-test": "^1.6.1"
+	}
+}
