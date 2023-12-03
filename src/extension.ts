@@ -21,7 +21,7 @@ const help_string =
 "Available commands:\n\
 * `help` - this message\n\
 * `cd <path>` - change directory\n\
-* `dir [<path>]` - display current directory or relative path\n\
+* `dir [<path>]` - display current directory or given path\n\
 	- aliases: `catalog`, `ls`\n\
 * `tree [--meta]` - display directory tree with optional metadata\n\
 * `get <file>` - try to decode file intelligently\n\
@@ -32,20 +32,20 @@ const help_string =
 * `sec <cyl,head,sector>` - hex dump sector\n\
 * `block <block>` - hex dump block\n\n\
 Notes:\n\
-* You can use wildcards with CP/M and FAT disks\n\
-* You can use CP/M 3 command tails, e.g., `dir *.com[full]`\n\
+* `dir` supports wildcards with CP/M and FAT disks\n\
+* `dir` supports CP/M 3 command tails, e.g., `dir *.com[full]`\n\
 * Always use forward slash separator, never backslash\n\
 * `<file>` can have spaces, do not quote or escape\n\
 * How to handle file type extensions\n\
 	- Apple: not part of filename\n\
 	- FAT or CP/M: part of filename\n\n\
-Limits:\n\
+Scope:\n\
 * Out of the many CP/M formats, the extension handles:\n\
 	- Apple, Amstrad, Kaypro, Nabu, Osborne, TRS-80 M2, and standard 8 inch\n\
 * Image types handled are\n\
-	- 2MG, IMD, TD0, WOZ (preferred)\n\
-	- D13, DSK, DO, NIB, PO, IMG, IMA\n\
-* Notebook cannot be saved, for write access or scripting use a2kit directly\n\
+	- structured: 2MG, IMD, TD0, WOZ\n\
+	- raw: D13, DSK, DO, NIB, PO, IMG, IMA\n\
+* Notebook cannot be saved, for write access or scripting use `a2kit` directly\n\
 * Notebook API does not let us stop you from saving.  If you do, the disk image is simply written back without change.\n";
 
 
@@ -57,6 +57,21 @@ export function activate(context: vscode.ExtensionContext) {
 
 class DiskImageProvider implements vscode.NotebookSerializer {
 	deserializeNotebook(data: Uint8Array, _token: vscode.CancellationToken): vscode.NotebookData | Thenable<vscode.NotebookData> {
+		let [vers, vers_err] = bin2txt(['-V'], undefined);
+		if (vers) {
+			const matches = vers.match(/a2kit ([0-9]+)\.([0-9]+)\.([0-9]+)/);
+			if (!matches || matches?.length!=4) {
+				vscode.window.showErrorMessage("error getting a2kit version, maybe this a2kit is too old");
+			}
+			if (matches?.length == 4) {
+				let v = [parseInt(matches[1]), parseInt(matches[2]), parseInt(matches[3])];
+				if (v < [2, 6, 0]) {
+					vscode.window.showErrorMessage("a2kit 2.6.0 is required, this is " + v[0] + "." + v[1] + "." + v[2]);
+				}
+			}
+		} else {
+			vscode.window.showErrorMessage("error getting a2kit version: " + vers_err);
+		}
 		let [root_dir,err] = bin2txt(['dir'],Buffer.from(data))
 		const out = new vscode.NotebookCellOutput([
 			vscode.NotebookCellOutputItem.text(root_dir ? root_dir : err)
@@ -78,7 +93,7 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 
 	serializeNotebook(data: vscode.NotebookData, _token: vscode.CancellationToken): Uint8Array | Thenable<Uint8Array> {
 		if (!data.metadata)
-			vscode.window.showErrorMessage("The disk image buffer is missing, please backup the file immediately.");
+			vscode.window.showErrorMessage("The disk image buffer is missing, please backup the file immediately, do NOT save notebook.");
 		let buf = data.metadata ? Buffer.from(data.metadata.img_data, "hex") : Buffer.from([0]);
 		return new Uint8Array(buf);
 	}
@@ -109,7 +124,7 @@ class DiskImageController {
 				}
 				if (cmd.length == 1 && cmd[0] == "help") {
 					out_cells.push(vscode.NotebookCellOutputItem.text(help_string,"text/markdown"));
-				} else if (cmd.length < 3 && (cmd[0] == "dir" || cmd[0] == "ls" || cmd[0] == "catalog")) {
+				} else if (cmd.length < 4 && (cmd[0] == "dir" || cmd[0] == "ls" || cmd[0] == "catalog")) {
 					let args = [cmd[0]];
 					if (img_path || cmd.length > 1) {
 						args.push("-f");
@@ -117,6 +132,14 @@ class DiskImageController {
 					}
 					if (cmd.length > 1) {
 						args[args.length - 1] += cmd[1];
+					}
+					if (cmd.length > 2) {
+						if (cmd[2] == "/w")
+							args[args.length - 1] += " " + cmd[2];
+						else {
+							out_cells.push(vscode.NotebookCellOutputItem.text("invalid option"));
+							continue;
+						}
 					}
 					const [res, err] = bin2txt(args, img_buf);
 					out_cells.push(vscode.NotebookCellOutputItem.text(res ? res : err));
@@ -140,13 +163,18 @@ class DiskImageController {
 						out_cells.push(vscode.NotebookCellOutputItem.text("file system has no directories"));
 						continue;
 					}
-					let new_path = img_path && cmd[1].charAt(0) != "/" ? img_path : (
-						tree.file_system == "prodos" ? "/" + tree.label.name + "/" : "/"
-					);
+					let new_path: string;
+					if (cmd[1].charAt(0) == "/") {
+						new_path = cmd[1]
+					} else {
+						new_path = img_path ? img_path : (
+							tree.file_system == "prodos" ? "/" + tree.label.name + "/" : "/"
+						);
+						new_path += cmd[1];
+					}
 					if (tree.file_system == "prodos" && cmd[1].trim()=="/") {
 						new_path = "/" + tree.label.name + "/";
 					}
-					new_path += cmd[1];
 					if (new_path.charAt(cmd[1].length - 1) != "/")
 						new_path += "/";
 					new_path = processDottedPath(new_path, tree.file_system, tree.label.name);
