@@ -8,6 +8,4 @@ If the notebook is saved, the disk image is written back, but with no changes.  
 
 Dependency: [a2kit](https://github.com/dfgordon/a2kit) must be installed and in the path.
 
-https://github.com/dfgordon/vscode-disk-image-notebook/assets/13408285/2bc70773-f32b-4f01-bbd5-d1f245840085
-
-
+https://github.com/dfgordon/vscode-disk-image-notebook/assets/13408285/6326ef20-3c59-46bd-a2a3-5cd73ac98186
