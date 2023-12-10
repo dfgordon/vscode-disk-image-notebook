@@ -37,19 +37,20 @@ const MSDosMap = new Map<string, string>([
  *
  * @param args the a2kit arguments 
  * @param stdin the optional binary data that is piped in
+ * @throws Error
  */
-export function bin2bin(args: string[], stdin: Buffer | undefined) : [Buffer | null, string] {
+export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
 	let res;
 	if (stdin)
 		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true });
 	else
 		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true });
 	if ((res.status != 0 || res.error) && res.stderr) {
-		return [null, `a2kit says: ${res.stderr}`];
+		throw new Error(`a2kit says: ${res.stderr}`);
 	} else if ((res.status != 0 || res.error) && !res.stderr) {
-		return [null, `error spawning a2kit (is it installed and in the path?)`];
+		throw new Error(`error spawning a2kit (is it installed and in the path?)`);
 	}
-	return [res.stdout,"succeeded"];
+	return res.stdout;
 }
 
 /**
@@ -57,19 +58,20 @@ export function bin2bin(args: string[], stdin: Buffer | undefined) : [Buffer | n
  *
  * @param args the a2kit arguments 
  * @param stdin the optional binary data that is piped in
+ * @throws Error
  */
-export function bin2txt(args: string[], stdin: Buffer | undefined) : [string | null, string] {
+export function bin2txt(args: string[], stdin: Buffer | undefined) : string {
 	let res;
 	if (stdin)
 		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true });
 	else
 		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true });
 	if ((res.status != 0 || res.error) && res.stderr) {
-		return [null, `a2kit says: ${res.stderr}`];
+		throw new Error(`a2kit says: ${res.stderr}`);
 	} else if ((res.status != 0 || res.error) && !res.stderr) {
-		return [null, `error spawning a2kit (is it installed and in the path?)`];
+		throw new Error(`error spawning a2kit (is it installed and in the path?)`);
 	}
-	return [`${res.stdout}`,"succeeded"];
+	return `${res.stdout}`;
 }
 
 interface FileImageType {
@@ -166,22 +168,35 @@ export class FileImage {
 		return typ ? typ : "bin";
 	}
 	/** Get the best text representation
-	 * @returns [result,""] or [null,err_str]
+	 * @throws Error
 	 * */
-	getText(path: string, stdin: Buffer): [string | null, string] {
+	getText(path: string, stdin: Buffer): string {
 		let typ = this.getBestType();
 		if (typ == "txt") {
+			if (this.img.file_system == "prodos" && this.img.aux != "0000") {
+				return bin2txt(["get", "-f", path, "-t", "rec"], stdin);
+			}
 			return bin2txt(["get", "-f", path, "-t", typ], stdin);
 		} else if (typ == "atok" || typ == "itok") {
-			const [tokens, err] = bin2bin(["get", "-f", path, "-t", typ], stdin);
-			return tokens ? bin2txt(["detokenize", "-t", typ], tokens) : [null, err];
+			const tokens = bin2bin(["get", "-f", path, "-t", typ], stdin);
+			return bin2txt(["detokenize", "-t", typ], tokens);
 		} else {
 			const baseAddr = this.getLoadAddr();
-			const [dat, err] = bin2bin(["get", "-f", path, "-t", typ], stdin);
-			if (!dat) {
-				return [null, err];
-			}
-			return [hexDump(dat, baseAddr), ""];
+			const dat = bin2bin(["get", "-f", path, "-t", typ], stdin);
+			return hexDump(dat, baseAddr);
+		}
+	}
+	/** Get a hex dump
+	 * @throws Error
+	 * */
+	getHex(path: string, stdin: Buffer, raw: boolean): string {
+		const baseAddr = this.getLoadAddr();
+		if (raw) {
+			const dat = bin2bin(["get", "-f", path, "-t", "raw", "--trunc"], stdin);
+			return hexDump(dat, baseAddr);
+		} else {
+			const dat = bin2bin(["get", "-f", path, "-t", "bin"], stdin);
+			return hexDump(dat, baseAddr);
 		}
 	}
 }

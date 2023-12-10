@@ -1,11 +1,14 @@
-# vscode-disk-image-notebook
+# Disk Image Notebook
 
-Look inside disk images right from your VS Code project.  Clicking on a supported disk image will show the disk directory in the file system's native style.  Various commands are available for extracting files, examining sectors, etc.  For the present, this is designed to never modify any disk image.  Nevertheless:
+This targets retro disk images.  Clicking on a supported image will show the directory in the file system's native style.  Various commands are available for extracting files, examining sectors, etc.  For the present, this is designed to never modify any disk image.  Nevertheless, please keep the originals backed up somewhere safe.  *This will do nothing without the backend*.
 
-*backup your disk images*
+## Backend Option 1
+1. Install a C compiler if necessary
+2. Install rust if necessary, often a package manager suffices, e.g. `brew install rust`, otherwise search for `rustup`
+3. Enter `cargo install a2kit` in your terminal
 
-If the notebook is saved, the disk image is written back, but with no changes.  The notebook itself, i.e. its cells, cannot be saved, although cell contents can be moved to other documents using the clipboard.  Yes, this is an abuse of the notebook persistence model, but we gain the convenience of selecting a disk image directly from the project tree.
+## Backend Option 2
+[Download an executable](https://github.com/dfgordon/a2kit/releases), taking care to put it in the terminal's path.
 
-Dependency: [a2kit](https://github.com/dfgordon/a2kit) must be installed and in the path.
-
-https://github.com/dfgordon/vscode-disk-image-notebook/assets/13408285/6326ef20-3c59-46bd-a2a3-5cd73ac98186
+## Demo
+<img src="dimg.gif" alt="session capture"/>
