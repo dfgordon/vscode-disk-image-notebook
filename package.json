@@ -3,14 +3,14 @@
 	"displayName": "Disk Image Notebook",
 	"description": "Look inside disk images",
 	"icon": "disk-image-icon.png",
-	"version": "0.0.0",
+	"version": "1.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
 		"url": "https://github.com/dfgordon/vscode-disk-image-notebook"
 	},
 	"engines": {
-		"vscode": "^1.75.0"
+		"vscode": "^1.85.0"
 	},
 	"categories": [
 		"Other"
@@ -18,7 +18,7 @@
 	"activationEvents": [
 		"onNotebook:disk-image-notebook"
 	],
-	"main": "./out/extension.js",
+	"main": "./extension/out/extension.js",
 	"capabilities": {
 		"virtualWorkspaces": true,
 		"untrustedWorkspaces": {
@@ -26,6 +26,20 @@
 		}
 	},
 	"contributes": {
+		"configuration": {
+			"title": "Disk Image Notebook",
+			"properties": {
+				"diskimage.interactiveTheme": {
+					"enum": [
+						"Amber Days",
+						"Sith Lord",
+						"True Neutral"
+					],
+					"default": "True Neutral",
+					"description": "Color theme for interactive controls."
+				}
+			}
+		},
 		"notebooks": [
 			{
 				"type": "disk-image-notebook",
@@ -37,31 +51,44 @@
 					}
 				]
 			}
+		],
+		"notebookRenderer": [
+			{
+			  "id": "disk-image-interactive",
+			  "entrypoint": "./render/out/index.js",
+			  "displayName": "Disk Image Interactive",
+			  "mimeTypes": [
+					"x-application/disk-image-interactive"
+				],
+			  "requiresMessaging": "always"
+			}
 		]
 	},
 	"scripts": {
-		"reset": "run-script-os",
-		"reset:windows": "npx rimraf .\\out && mkdir .\\out",
-		"reset:default": "npx rimraf ./out && mkdir ./out",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"test-compile": "npm run reset && tsc -p ./",
-		"test": "node ./out/test/runTest.js",
-		"esbuild-wrp": "npm run reset && esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
-		"vscode:prepublish": "npm run esbuild-wrp -- --minify",
-		"build": "npm run esbuild-wrp -- --sourcemap"
+		"reset-render": "run-script-os",
+		"reset-extension": "run-script-os",
+		"reset-render:windows": "npx rimraf render\\out && mkdir render\\out",
+		"reset-render:default": "npx rimraf render/out && mkdir render/out",
+		"reset-extension:windows": "npx rimraf extension\\out && mkdir extension\\out",
+		"reset-extension:default": "npx rimraf extension/out && mkdir extension/out",
+		"vscode:prepublish": "npm run esbuild-render -- --minify && npm run esbuild-extension -- --minify",
+		"esbuild-render": "npm run reset-render && esbuild ./render/src/index.ts --bundle --outfile=render/out/index.js --format=esm --platform=node",
+		"esbuild-extension": "npm run reset-extension && esbuild ./extension/src/extension.ts --bundle --outfile=extension/out/extension.js --external:vscode --format=cjs --platform=node",
+		"build": "npm run esbuild-render -- --sourcemap && npm run esbuild-extension -- --sourcemap",
+		"lint": "eslint . --ext .ts,.tsx",
+		"test-compile": "npm run reset-extension && tsc -b ./extension/src",
+		"test": "node ./extension/out/test/runTest.js"
 	},
 	"devDependencies": {
-		"@types/glob": "^8.1.0",
-		"@types/mocha": "^10.0.4",
-		"@types/node": "^13.11.0",
-		"@types/vscode": "1.60",
-		"esbuild": "^0.19.6",
-		"glob": "^8.1.0",
-		"mocha": "^10.0.4",
+		"@types/node": "18.x",
+		"@types/vscode": "^1.85.0",
+		"@typescript-eslint/eslint-plugin": "^6.16.0",
+		"@typescript-eslint/parser": "^6.16.0",
+		"esbuild": "^0.19.9",
+		"eslint": "8.56.0",
 		"rimraf": "^5.0.1",
 		"run-script-os": "^1.1.6",
-		"typescript": "^5.2.2",
+		"typescript": "^5.3.2",
 		"vscode-test": "^1.6.1"
 	}
 }

@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"rootDir": ".",
+		"outDir": "../out",
+		"declaration": true,
+		"composite": true
+	},
+	"exclude": [
+		"node_modules",
+		".vscode-test"
+	]
+}

@@ -1,6 +1,6 @@
 # Disk Image Notebook
 
-This targets retro disk images.  Clicking on a supported image will show the directory in the file system's native style.  Various commands are available for extracting files, examining sectors, etc.  For the present, this is designed to never modify any disk image.  Nevertheless, please keep the originals backed up somewhere safe.  *This will do nothing without the backend*.
+Click on a disk image in your project tree to see the root directory in the file system's native style.  Dig deeper using either the interactive mode or by entering commands in code cells.  For the present, this is designed to never modify any disk image.  *This will do nothing without the backend*.
 
 ## Backend Option 1
 1. Install a C compiler if necessary
@@ -8,7 +8,11 @@ This targets retro disk images.  Clicking on a supported image will show the dir
 3. Enter `cargo install a2kit` in your terminal
 
 ## Backend Option 2
+
 [Download an executable](https://github.com/dfgordon/a2kit/releases), taking care to put it in the terminal's path.
 
 ## Demo
+
 <img src="dimg.gif" alt="session capture"/>
+
+note: install appropriate language extensions to gain highlights, diagnostics, etc., upon opening a file in the editor.  Often the file must be saved before analysis becomes available.

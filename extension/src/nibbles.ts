@@ -1,3 +1,5 @@
+import { bin2txt, bin2bin } from './a2kit.js';
+
 export const FluxOptions = {
     FM: 0,
     MFM: 1,
@@ -85,7 +87,7 @@ const DISK_BYTES_62 = [
 ];
 
 function invert_53() : number[] {
-    let ans = new Array<number>(256);
+    const ans = new Array<number>(256);
     ans.fill(INVALID_NIB_BYTE);
     for (let i = 0; i < 32; i++) {
         ans[DISK_BYTES_53[i]] = i;
@@ -94,7 +96,7 @@ function invert_53() : number[] {
 }
 
 function invert_62() : number[] {
-    let ans = new Array<number>(256);
+    const ans = new Array<number>(256);
     ans.fill(INVALID_NIB_BYTE);
     for (let i = 0; i < 64; i++) {
         ans[DISK_BYTES_62[i]] = i;
@@ -102,17 +104,17 @@ function invert_62() : number[] {
     return ans;
 }
 
-/** decode two bytes, returning the nibbles in a single u8 */
+/** decode two 4&4 nibbles, returning an ordinary byte value */
 function decode_44(nibs: [number,number]) : number {
     return ((nibs[0] << 1) | 0x01) & nibs[1]
 }
 
-/** decode a byte, returning a 5-bit nibble in a u8 */
+/** decode a 5&3 nibble, returning a 5-bit value */
 function decode_53(byte: number,inv: number[]) : number {
     return inv[byte];
 }
 
-/** decode a byte, returning a 6-bit nibble in a u8 */
+/** decode a 6&2 nibble, returning a 6-bit value */
 function decode_62(byte: number,inv: number[]) : number {
     return inv[byte];
 }
@@ -128,7 +130,7 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
     let slice_start = 0;
     let addr_count = 0;
     let err_count = 0;
-    let [apro, aepi, dpro, depi] = [nibs.addrProlog, nibs.addrEpilog, nibs.dataProlog, nibs.dataEpilog];
+    const [apro, aepi, dpro, depi] = [nibs.addrProlog, nibs.addrEpilog, nibs.dataProlog, nibs.dataEpilog];
     let nib_table: number[] | undefined;
     if (nibs.dataNib == NibbleOptions.N53) {
         nib_table = DISK_BYTES_53;
@@ -142,24 +144,24 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
     if (nibs.addrNib != NibbleOptions.N44) {
         addr_nib_count = 5;
     }
-    let inv = invert_62();
+    const inv = invert_62();
     let slice_end = 0;
     do {
-        let row_label = start_addr + slice_start;
+        const row_label = start_addr + slice_start;
         slice_end = slice_start + 16;
         if (slice_end > trk.byteLength) {
             slice_end = trk.byteLength;
         }
         let mnemonics = "";
         for (let i = slice_start; i < slice_end; i++) {
-            let bak = i >= 0 ? trk[i - 1] : 0;
-            let fwd = i + 1 < trk.byteLength ? trk[i + 1] : 0;
+            const bak = i >= 0 ? trk[i - 1] : 0;
+            const fwd = i + 1 < trk.byteLength ? trk[i + 1] : 0;
             if (!nib_table.includes(trk[i]) && trk[i]!=0xaa && trk[i]!=0xd5) {
                 mnemonics += "?";
                 err_count += 1;
             } else if (addr_count > 0) {
                 if (nibs.addrNib == NibbleOptions.N62) {
-                    let val = decode_62(trk[i], inv);
+                    const val = decode_62(trk[i], inv);
                     if (val < 16) {
                         mnemonics += val.toString(16);
                     } else if (val != INVALID_NIB_BYTE) {
@@ -223,4 +225,38 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
         ans += "Encountered " + err_count + " invalid bytes\n";
     }
     return ans;
+}
+
+/** use the image data to find the nibble descriptor.
+ * @throws Error
+ */
+export function GetNibbleDesc(img_buf: Buffer): NibbleDesc | undefined {
+    const raw_meta = bin2txt(["get", "-t", "meta"], img_buf);
+    const meta = JSON.parse(raw_meta);
+    let defer13_16 = false;
+    if (meta.nib) {
+        defer13_16 = true;
+    } else if (meta["2mg"]?.header?.img_fmt?._raw == "02000000") {
+        defer13_16 = true;
+    } else if (meta.woz1) {
+        defer13_16 = true;
+    } else if (meta.woz2?.info?.disk_type?._raw == "01") {
+        if (meta.woz2?.info?.boot_sector_format?._raw == "01")
+            return Std16;
+        else if (meta.woz2?.info?.boot_sector_format?._raw == "02")
+            return Std13;
+        else {
+            defer13_16 = true;
+        }
+    } else if (meta.woz2?.info?.disk_type?._raw == "02") {
+        return Std35;
+    }
+    if (!defer13_16)
+        return undefined;
+    try {
+        const sec15 = bin2bin(["get", "-t", "sec", "-f", "0,0,15"], img_buf);
+        return Std16;
+    } catch {
+        return Std13;
+    }
 }

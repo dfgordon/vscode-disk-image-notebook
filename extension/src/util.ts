@@ -1,6 +1,70 @@
-export function processDottedPath(full_path: string,fs: string,lab: string): string {
-	let old_nodes = full_path.split("/");
-	let new_nodes: string[] = [];
+import { DirectoryRow } from "../../messages/src/base.js";
+
+export interface Tree {
+    file_system: string,
+    files: any,
+    label: {
+        name: string | undefined
+    }
+}
+
+export function parseCHS(chs: string): [number, number, number] {
+    const ary = chs.split(',').map((s) => parseInt(s));
+    if (ary.length == 3) {
+        return [ary[0], ary[1], ary[2]];
+    }
+    throw new Error("unexpected error parsing CHS");
+}
+
+export function rootPath(tree: Tree): string {
+    return tree.file_system == "prodos" ? "/" + tree.label.name + "/" : "/";
+}
+
+/**
+ * Get directory rows.  If path leads to a file the rows will be null.
+ * Empty directroy will not be null, just empty array.
+ * @param path path of subdirectory or file
+ * @param tree the entire directory tree with metadata
+ * @returns [new path, directory rows or null]
+ */
+export function getFiles(path: string, tree: Tree): [string, DirectoryRow[] | null] {
+    const nodes = path.split("/");
+    let new_path = "";
+    const beg = tree.file_system == "prodos" ? 2 : 1;
+    let subdir = tree.files;
+    for (let lev = 0; lev < beg; lev++) {
+        new_path += nodes[lev] + "/";
+    }
+    for (let lev = beg; lev < nodes.length; lev++) {
+        if (nodes[lev] == "")
+            break;
+        const temp = subdir[nodes[lev]];
+        if (!temp)
+            break;
+        if (!temp.files) {
+            // this is a file
+            if (tree.file_system == "a2 dos" || tree.file_system == "a2 pascal") {
+                return [nodes[lev], null];
+            } else {
+                return [new_path + nodes[lev], null];
+            }
+        }
+        new_path += nodes[lev] + "/";
+        subdir = temp.files;
+    }
+    const rows: DirectoryRow[] = [];
+    for (const key of Object.keys(subdir)) {
+        rows.push({
+            name: key,
+            meta: subdir[key].meta ? subdir[key].meta : {},
+        });
+    }
+    return [new_path, rows];
+}
+
+export function processDottedPath(full_path: string, fs: string, lab: string | undefined): string {
+	const old_nodes = full_path.split("/");
+	const new_nodes: string[] = [];
 	for (const node of old_nodes) {
 		if (node == ".") {
 			continue;
@@ -33,8 +97,8 @@ export function trailingArgWithSpaces(line: string, last_idx: number): string {
 	return line;
 }
 
-export function verifyPath(path: string, tree: any, fs: string, req_re: RegExp | null): boolean {
-    let nodes = path.split('/');
+export function verifyPath(path: string, tree: Tree, fs: string, req_re: RegExp | null): boolean {
+    const nodes = path.split('/');
     if (nodes.length < 2) {
         return false;
     }
@@ -45,7 +109,7 @@ export function verifyPath(path: string, tree: any, fs: string, req_re: RegExp |
             return false;
     }
     if (fs == "prodos") {
-        if (tree.label.name.toLowerCase() != nodes[1].toLowerCase()) {
+        if (tree.label.name?.toLowerCase() != nodes[1].toLowerCase()) {
             return false;
         }
     }
@@ -65,7 +129,7 @@ export function verifyPath(path: string, tree: any, fs: string, req_re: RegExp |
             return false;
         tree_node = tree_node.files;
     }
-    return tree_node;
+    return true;
 }
 
 export function hexDump(dat: Buffer,baseAddr: number) : string {

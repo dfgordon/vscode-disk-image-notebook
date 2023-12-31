@@ -1,5 +1,5 @@
-import { spawnSync } from 'child_process';
-import { hexDump } from './util'
+import { spawnSync, SpawnSyncReturns } from 'child_process';
+import { hexDump } from './util.js'
 
 const A2DosMap = new Map<string, string>([
 	["00", "txt"],
@@ -40,11 +40,11 @@ const MSDosMap = new Map<string, string>([
  * @throws Error
  */
 export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
-	let res;
+	let res: SpawnSyncReturns<Buffer>;
 	if (stdin)
-		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true });
+		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true, maxBuffer: 32*1024*1024 });
 	else
-		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true });
+		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true, maxBuffer: 32*1024*1024 });
 	if ((res.status != 0 || res.error) && res.stderr) {
 		throw new Error(`a2kit says: ${res.stderr}`);
 	} else if ((res.status != 0 || res.error) && !res.stderr) {
@@ -61,11 +61,11 @@ export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
  * @throws Error
  */
 export function bin2txt(args: string[], stdin: Buffer | undefined) : string {
-	let res;
+	let res: SpawnSyncReturns<Buffer>;
 	if (stdin)
-		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true });
+		res = spawnSync('a2kit', args, { timeout: 10000, input: stdin, windowsHide: true, maxBuffer: 32*1024*1024 });
 	else
-		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true });
+		res = spawnSync('a2kit', args, { timeout: 10000, windowsHide: true, maxBuffer: 32*1024*1024 });
 	if ((res.status != 0 || res.error) && res.stderr) {
 		throw new Error(`a2kit says: ${res.stderr}`);
 	} else if ((res.status != 0 || res.error) && !res.stderr) {
@@ -171,10 +171,18 @@ export class FileImage {
 	 * @throws Error
 	 * */
 	getText(path: string, stdin: Buffer): string {
-		let typ = this.getBestType();
+		const typ = this.getBestType();
 		if (typ == "txt") {
 			if (this.img.file_system == "prodos" && this.img.aux != "0000") {
 				return bin2txt(["get", "-f", path, "-t", "rec"], stdin);
+			}
+			if ((this.img.file_system == "prodos" || this.img.file_system == "a2 dos") && path.endsWith(".S")) {
+				try {
+					const tokens = bin2bin(["get", "-f", path, "-t", "mtok"], stdin);
+					return bin2txt(["detokenize", "-t", "mtok"], tokens);
+				} catch {
+					console.log("attempt to interpret .S as Merlin failed");
+				}
 			}
 			return bin2txt(["get", "-f", path, "-t", typ], stdin);
 		} else if (typ == "atok" || typ == "itok") {
@@ -183,6 +191,11 @@ export class FileImage {
 		} else {
 			const baseAddr = this.getLoadAddr();
 			const dat = bin2bin(["get", "-f", path, "-t", typ], stdin);
+			if (baseAddr == 0) {
+				const tentative_string = dat.toString('utf8');
+				if (!tentative_string.includes('\ufffd'))
+					return tentative_string;
+			}
 			return hexDump(dat, baseAddr);
 		}
 	}
