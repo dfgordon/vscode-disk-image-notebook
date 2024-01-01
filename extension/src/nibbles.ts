@@ -86,14 +86,14 @@ const DISK_BYTES_62 = [
     0xf7, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
 ];
 
-function invert_53() : number[] {
-    const ans = new Array<number>(256);
-    ans.fill(INVALID_NIB_BYTE);
-    for (let i = 0; i < 32; i++) {
-        ans[DISK_BYTES_53[i]] = i;
-    }
-    return ans;
-}
+// function invert_53() : number[] {
+//     const ans = new Array<number>(256);
+//     ans.fill(INVALID_NIB_BYTE);
+//     for (let i = 0; i < 32; i++) {
+//         ans[DISK_BYTES_53[i]] = i;
+//     }
+//     return ans;
+// }
 
 function invert_62() : number[] {
     const ans = new Array<number>(256);
@@ -109,10 +109,10 @@ function decode_44(nibs: [number,number]) : number {
     return ((nibs[0] << 1) | 0x01) & nibs[1]
 }
 
-/** decode a 5&3 nibble, returning a 5-bit value */
-function decode_53(byte: number,inv: number[]) : number {
-    return inv[byte];
-}
+// /** decode a 5&3 nibble, returning a 5-bit value */
+// function decode_53(byte: number,inv: number[]) : number {
+//     return inv[byte];
+// }
 
 /** decode a 6&2 nibble, returning a 6-bit value */
 function decode_62(byte: number,inv: number[]) : number {
@@ -254,7 +254,7 @@ export function GetNibbleDesc(img_buf: Buffer): NibbleDesc | undefined {
     if (!defer13_16)
         return undefined;
     try {
-        const sec15 = bin2bin(["get", "-t", "sec", "-f", "0,0,15"], img_buf);
+        bin2bin(["get", "-t", "sec", "-f", "0,0,15"], img_buf);
         return Std16;
     } catch {
         return Std13;

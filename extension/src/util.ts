@@ -2,6 +2,7 @@ import { DirectoryRow } from "../../messages/src/base.js";
 
 export interface Tree {
     file_system: string,
+    // eslint-disable-next-line
     files: any,
     label: {
         name: string | undefined
@@ -18,6 +19,14 @@ export function parseCHS(chs: string): [number, number, number] {
 
 export function rootPath(tree: Tree): string {
     return tree.file_system == "prodos" ? "/" + tree.label.name + "/" : "/";
+}
+
+export function cpmForm(path: string): string {
+    let newPath = path.replace(/\/([0-9]+)\/(.*)/, '$1:$2');
+    // a2kit 2.7.0 can't find a file without an extension without a trailing `.`
+    if (newPath.lastIndexOf('.') == -1)
+        newPath += '.';
+    return newPath;
 }
 
 /**
@@ -86,15 +95,15 @@ export function processDottedPath(full_path: string, fs: string, lab: string | u
 }
 
 export function trailingArgWithSpaces(line: string, last_idx: number): string {
-	if (last_idx == 0) {
-		return line;
-	}
-	const re = new RegExp('\\S+(\\s+\\S+){'+(last_idx-1)+'}(\\s.+)');
-	const matches = line.match(re);
-	if (matches) {
-		return matches[2].trimStart();
-	}
-	return line;
+    let ans = line;
+    if (last_idx > 0) {
+        const re = new RegExp('\\S+(\\s+\\S+){' + (last_idx - 1) + '}(\\s.+)');
+        const matches = line.match(re);
+        if (matches) {
+            ans = matches[2].trimStart();
+        }
+    }
+	return ans;
 }
 
 export function verifyPath(path: string, tree: Tree, fs: string, req_re: RegExp | null): boolean {
@@ -133,10 +142,10 @@ export function verifyPath(path: string, tree: Tree, fs: string, req_re: RegExp 
 }
 
 export function hexDump(dat: Buffer,baseAddr: number) : string {
-    const pos_str = Buffer.from(Uint8Array.from(dat).map((val, idx, ary) => {
+    const pos_str = Buffer.from(Uint8Array.from(dat).map((val) => {
         return val >= 32 && val < 127 ? val : 46;
     })).toString();
-    const neg_str = Buffer.from(Uint8Array.from(dat).map((val, idx, ary) => {
+    const neg_str = Buffer.from(Uint8Array.from(dat).map((val) => {
         return val >= 160 && val < 255 ? val - 128 : 46;
     })).toString();
     let content = "";

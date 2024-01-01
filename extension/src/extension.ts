@@ -55,9 +55,9 @@ const help_string =
 	- Apple: not part of filename\n\
 	- FAT or CP/M: part of filename\n\
 \nScope:\n\
-* Decodes Apple tokenized BASIC, Merlin sources, Pascal sources, and others\n\
+* Decodes Applesoft, Integer BASIC, Merlin sources, Pascal sources, ProDOS random access, and others\n\
 * Out of the many CP/M formats, the extension handles:\n\
-	- Apple, Amstrad, Kaypro, Nabu, Osborne, TRS-80 M2, and standard 8 inch\n\
+	- Apple, Amstrad, Kaypro, Nabu, Osborne, TRS-80 M2, and IBM 250K (latter encompasses various vendors)\n\
 * Image types handled are\n\
 	- structured: 2MG, IMD, TD0, WOZ\n\
 	- raw: D13, DSK, DO, NIB, PO, IMG, IMA\n\
@@ -72,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 class DiskImageProvider implements vscode.NotebookSerializer {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	deserializeNotebook(data: Uint8Array, token: vscode.CancellationToken): vscode.NotebookData | Thenable<vscode.NotebookData> {
 		const out = new vscode.NotebookCellOutput([]);
 		const img_hash = crypto.createHash('sha256').update(data).digest('hex');
@@ -119,6 +120,7 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 		return notebook;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	serializeNotebook(data: vscode.NotebookData, token: vscode.CancellationToken): Uint8Array | Thenable<Uint8Array> {
 		if (!data.metadata)
 			vscode.window.showErrorMessage("The disk image buffer is missing, please backup the file immediately, do NOT save notebook.");
@@ -144,9 +146,21 @@ class DiskImageController {
 			const now = Date.now();
 			const hash = event.notebook.metadata.img_hash;
 			const buf = this.updateData(hash, event.notebook.metadata.img_data);
-			this.updateGeometry(hash, buf);
-			this.updateStatistics(hash, buf);
-			this.updateTree(hash, buf);
+			try {
+				this.updateGeometry(hash, buf);
+			} catch (error) {
+				console.log("could not update geometry");
+			}
+			try {
+				this.updateStatistics(hash, buf);
+			} catch (error) {
+				console.log("could not update stats");
+			}
+			try {
+				this.updateTree(hash, buf);
+			} catch (error) {
+				console.log("could not update tree");
+			}
 			this.stale_map.set(hash, now);
 			this.garbageCollection(hash, now);
 		});
@@ -167,9 +181,10 @@ class DiskImageController {
 				const chs_str = messg.chs[0].toString() + "," + messg.chs[1].toString() + "," + messg.chs[2].toString();				
 				try {
 					const res = bin2bin(["get", "-t", "sec", "-f", chs_str], img_buf);
-					this.vs_messager.postMessage(new trk_mess.ReturnedSector(util.hexDump(res, 0),messg.img_hash));
-				} catch (error: any) {
-					this.vs_messager.postMessage(new trk_mess.ReturnedSector(error.message,messg.img_hash));
+					this.vs_messager.postMessage(new trk_mess.ReturnedSector(util.hexDump(res, 0), messg.img_hash));
+				} catch (error) {
+					if (error instanceof Error)
+						this.vs_messager.postMessage(new trk_mess.ReturnedSector(error.message,messg.img_hash));
 				}
 			} else if (trk_mess.LoadBlock.test(event.message)) {
 				const messg: trk_mess.LoadBlock = event.message;
@@ -177,8 +192,9 @@ class DiskImageController {
 				try {
 					const res = bin2bin(["get", "-t", "block", "-f", messg.block.toString()],img_buf);
 					this.vs_messager.postMessage(new trk_mess.ReturnedBlock(util.hexDump(res, 0),messg.img_hash));
-				} catch (error: any) {
-					this.vs_messager.postMessage(new trk_mess.ReturnedBlock(error.message,messg.img_hash));
+				} catch (error) {
+					if (error instanceof Error)
+						this.vs_messager.postMessage(new trk_mess.ReturnedBlock(error.message,messg.img_hash));
 				}
 			} else if (trk_mess.LoadNibbles.test(event.message)) {
 				const messg: trk_mess.LoadNibbles = event.message;
@@ -189,8 +205,9 @@ class DiskImageController {
 					const nib_desc = nib.GetNibbleDesc(img_buf);
 					if (nib_desc)
 						this.vs_messager.postMessage(new trk_mess.ReturnedNibbles(nib.trackDump(res, nib_desc),messg.img_hash));
-				} catch (error: any) {
-					this.vs_messager.postMessage(new trk_mess.ReturnedNibbles(error.message,messg.img_hash));
+				} catch (error) {
+					if (error instanceof Error)
+						this.vs_messager.postMessage(new trk_mess.ReturnedNibbles(error.message,messg.img_hash));
 				}
 			} else if (xp_mess.ChangeDirectory.test(event.message)) {
 				const messg: xp_mess.ChangeDirectory = event.message;
@@ -201,7 +218,7 @@ class DiskImageController {
 					this.vs_messager.postMessage(new xp_mess.ReturnedSubdirectory(new_path_actual, rows, messg.img_hash));
 				}
 				else {
-					const cpm_corrected = tree.file_system == "cpm" ? new_path_actual.replace(/\/([0-9]+)\/(.*)/, '$1:$2') : new_path_actual;
+					const cpm_corrected = tree.file_system == "cpm" ? util.cpmForm(new_path_actual) : new_path_actual;
 					const res = bin2txt(["get", "-f", cpm_corrected, "-t", "any"], img_buf);
 					const fimg = new FileImage(res);
 					const res2 = fimg.getText(cpm_corrected, img_buf);
@@ -269,7 +286,6 @@ class DiskImageController {
 	}
 	/** get and return the secondary buffer, retrieving from the main hex string that
 	 * is stored in the notebook's metadata, if not already done
-	 * @throws Error
 	 */
 	updateData(img_hash: string, img_data: string): Buffer {
 		let buf = this.data_map.get(img_hash);
