@@ -1,5 +1,5 @@
 import type { RendererContext } from 'vscode-notebook-renderer';
-import { useState } from 'preact/hooks'
+import { useState, useRef } from 'preact/hooks'
 import { VNode } from 'preact';
 import { html } from 'htm/preact';
 import * as decode from './decode.js';
@@ -87,6 +87,85 @@ function file_header(fs: string,path: string): VNode {
     }
 }
 
+function DasmMenu(props: ThemeButtonProps) {
+    function highlight(style: CSSStyleDeclaration) {
+        style.backgroundColor = props.color_theme.radioOnBackground;
+        style.color = props.color_theme.radioOnForeground;
+    }
+    function unhighlight(style: CSSStyleDeclaration) {
+        style.backgroundColor = props.color_theme.radioOffBackground;
+        style.color = props.color_theme.radioOffForeground;
+    }
+    // some better way?
+    const menu0 = useRef(null);
+    const highlight0 = () => highlight(menu0.current.style);
+    const unhighlight0 = () => unhighlight(menu0.current.style);
+    const menu1 = useRef(null);
+    const highlight1 = () => highlight(menu1.current.style);
+    const unhighlight1 = () => unhighlight(menu1.current.style);
+    const menu2 = useRef(null);
+    const highlight2 = () => highlight(menu2.current.style);
+    const unhighlight2 = () => unhighlight(menu2.current.style);
+    const menu3 = useRef(null);
+    const highlight3 = () => highlight(menu3.current.style);
+    const unhighlight3 = () => unhighlight(menu3.current.style);
+    const menu4 = useRef(null);
+    const highlight4 = () => highlight(menu4.current.style);
+    const unhighlight4 = () => unhighlight(menu4.current.style);
+    const menu5 = useRef(null);
+    const highlight5 = () => highlight(menu5.current.style);
+    const unhighlight5 = () => unhighlight(menu5.current.style);
+
+    const dropdown = useRef(null);
+    const showMenu = () => dropdown.current.style.display = "block";
+    const hideMenu = () => dropdown.current.style.display = "none";
+    const css_dropdown = {
+        position: 'relative',
+        display: 'inline-block'
+    };
+    const css_content = {
+        display: 'none',
+        position: 'absolute',
+        overflow: 'auto',
+        'z-index': 1,
+        'text-decoration': 'none',
+        border: props.color_theme.buttonBorder,
+        'background-color': props.color_theme.buttonBackground,
+        color: props.color_theme.buttonForeground
+    };
+    const css_btn = {
+        border: props.color_theme.buttonBorder,
+        'background-color': props.color_theme.buttonBackground,
+        color: props.color_theme.buttonForeground,
+        'text-decoration': 'none',
+        padding: '2px 8px',
+        cursor: 'pointer'
+    };
+    const css_item = {
+        border: props.color_theme.buttonBorder,
+        'background-color': props.color_theme.radioDisabledBackground,
+        color: props.color_theme.radioOffForeground,
+        'text-decoration': 'none',
+        padding: '2px 8px',
+        cursor: 'pointer',
+        overflow: 'auto',
+        display: 'block',
+        'white-space': 'nowrap'
+    };
+    return html`
+    <div style=${css_dropdown} onMouseEnter=${showMenu} onMouseLeave=${hideMenu}>
+        <a href="#" style=${css_btn}>${props.name}</a>
+        <div ref=${dropdown} style=${css_content}>
+            <div><a href="#" ref=${menu0} style=${css_item} onMouseEnter=${highlight0} onMouseLeave=${unhighlight0} onClick=${props.callback}>6502</a></div>
+            <div><a href="#" ref=${menu1} style=${css_item} onMouseEnter=${highlight1} onMouseLeave=${unhighlight1} onClick=${props.callback}>65c02</a></div>
+            <div><a href="#" ref=${menu2} style=${css_item} onMouseEnter=${highlight2} onMouseLeave=${unhighlight2} onClick=${props.callback}>65816 mx=00</a></div>
+            <div><a href="#" ref=${menu3} style=${css_item} onMouseEnter=${highlight3} onMouseLeave=${unhighlight3} onClick=${props.callback}>65816 mx=01</a></div>
+            <div><a href="#" ref=${menu4} style=${css_item} onMouseEnter=${highlight4} onMouseLeave=${unhighlight4} onClick=${props.callback}>65816 mx=10</a></div>
+            <div><a href="#" ref=${menu5} style=${css_item} onMouseEnter=${highlight5} onMouseLeave=${unhighlight5} onClick=${props.callback}>65816 mx=11</a></div>
+        </div>
+    </div>`;
+}
+
 function user_selection(props: UserSelectProps) {
     const onChange = (event: Event) => {
         if (event.target instanceof HTMLSelectElement) {
@@ -125,6 +204,7 @@ export function Explore(props: ExploreProps) {
     const [dir, setDir] = useState(true);
     const [rows, setRows] = useState(props.start_files);
     const [content, setContent] = useState("");
+    const [objectCode, setObjectCode] = useState(null);
     const [typ, setTyp] = useState("");
     const [path, setPath] = useState(props.start_path);
     const [user, setUser] = useState(props.stat.users.length > 0 ? props.stat.users[0] : "0");
@@ -138,6 +218,7 @@ export function Explore(props: ExploreProps) {
             const tm: xp.ReturnedFile = messg;
             setPath(tm.new_path);
             setContent(tm.content);
+            setObjectCode(tm.objectCode);
             setTyp(tm.typ);
             setDir(false);
         }
@@ -165,6 +246,23 @@ export function Explore(props: ExploreProps) {
             props.ctx.postMessage(new xp.OpenFile(content, props.stat.fs_name, typ, props.img_hash));
         }
     }
+    const onDasm = (event: Event) => {
+        if (event.target instanceof HTMLElement) {
+            if (event.target.textContent == "6502") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 0, "11", props.img_hash));
+            } else if (event.target.textContent == "65c02") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 1, "11", props.img_hash));
+            } else if (event.target.textContent == "65816 mx=00") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "00", props.img_hash));
+            } else if (event.target.textContent == "65816 mx=01") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "01", props.img_hash));
+            } else if (event.target.textContent == "65816 mx=10") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "10", props.img_hash));
+            } else if (event.target.textContent == "65816 mx=11") {
+                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "11", props.img_hash));
+            }
+        }
+    }
     const onUser = (event: Event) => {
         if (event.target instanceof HTMLSelectElement) {
             setUser(event.target.value);
@@ -172,7 +270,25 @@ export function Explore(props: ExploreProps) {
         }
     }
 
-    if (!dir) {
+    if (!dir && objectCode && (props.stat.fs_name == "prodos" || props.stat.fs_name == "a2 dos")) {
+        return html`
+        <div style=${{ 'padding-top': '10px', clear: 'left' }}>
+        ${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}
+        <span style=${{ 'padding-left': '10px', 'padding-right': '10px' }}>
+            ${file_header(props.stat.fs_name, path)}
+        </span>
+        <span style=${{ 'padding-right': '10px' }}>
+            ${themeButton({ name: "🗁", color_theme: props.color_theme, callback: onOpen })}
+        </span>
+        ${DasmMenu({ name: "DASM", color_theme: props.color_theme, callback: onDasm })}
+        </div>
+        <div>
+        <pre>
+        ${content}
+        </pre>
+        </div>
+        `;
+    }  else if (!dir) {
         return html`
         <div style=${{ 'padding-top': '10px', clear: 'left' }}>
         ${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}

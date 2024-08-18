@@ -7,6 +7,11 @@ import * as interactive from '../../messages/src/base.js';
 import * as trk_mess from '../../messages/src/trk.js';
 import * as xp_mess from '../../messages/src/explore.js';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+export let serverCommand: string | undefined = undefined;
 
 const GARBAGE_THRESHOLD = 64 * 1024 * 1024;
 
@@ -31,17 +36,19 @@ const help_string =
 * `dir [<path>]` - display current directory or given path\n\
 	- aliases: `catalog`, `ls`\n\
 * `cd <path>` - change directory\n\
-* `tree [--meta]` - display directory tree with optional metadata\n\
+* `tree [--meta] [--indent <spaces>]` - display directory tree with optional metadata\n\
 \nCode Cells - files: \n\
 * `get <file>` - try to decode file intelligently\n\
+* `glob <pattern>` - search for files using a glob pattern\n\
+* `dasm <processor> <file>` - disassemble file targeting processor\n\
 * `hex <file>` - display hex dump of file\n\
 	- May include headers and extension to block boundary\n\
 * `type <file>` - display file as lossy UTF8\n\
 * `clone <file>` - get the detailed file image\n\
 \nCode Cells - metadata: \n\
 * `meta` - get disk image metadata\n\
-* `stat` - get file system statistics\n\
-* `geometry` - get disk geometry\n\
+* `stat [<indent>]` - get file system statistics\n\
+* `geometry [<indent>]` - get disk geometry\n\
 \nCode Cells - binary: \n\
 * `track <cyl,head>` - hex dump track nibbles (if applicable)\n\
 * `sec <cyl,head,sector>` - hex dump sector\n\
@@ -64,8 +71,71 @@ const help_string =
 * Notebook cannot be saved, for write access or scripting use `a2kit` directly\n\
 * Notebook API does not let us stop you from saving.  If you do, the disk image is simply written back without change.\n";
 
+/** convert arch-platform to rust convention */
+function targetTriple(): string[] {
+	const ans = [];
+	
+	// CPU part
+	if (os.arch() == "arm64") {
+		ans.push("aarch64");
+	} else if (os.arch() == "x64") {
+		ans.push("x86_64");
+	} else {
+		ans.push("unknown");
+	}
+
+	// Vendor part
+	if (os.platform() == "darwin") {
+		ans.push("apple");
+	} else if (os.platform() == "linux") {
+		ans.push("unknown");
+	} else if (os.platform() == "win32") {
+		ans.push("pc");
+	} else {
+		ans.push("unknown");
+	}
+
+	// OS-ABI part
+	if (os.platform() == "darwin") {
+		ans.push("darwin");
+	} else if (os.platform() == "linux") {
+		ans.push("linux-musl");
+	} else if (os.platform() == "win32") {
+		ans.push("windows-msvc.exe");
+	} else {
+		ans.push("unknown");
+	}
+
+	return ans;
+}
+
+function getExecutableNames(context: vscode.ExtensionContext): string[] {
+	const ans = [];
+	const [cpu, vendor, opSys] = targetTriple();
+	const bundled = "a2kit" + "-" + cpu + "-" + vendor + "-" + opSys;
+	ans.push(context.asAbsolutePath(path.join('server', bundled)));
+	const external = "a2kit" + (opSys.endsWith(".exe") ? ".exe" : "");
+	ans.push(path.join(os.homedir(),".cargo","bin",external));
+	return ans;
+}
 
 export function activate(context: vscode.ExtensionContext) {
+	const serverCommandOptions = getExecutableNames(context);
+	for (const cmd of serverCommandOptions) {
+		if (fs.existsSync(cmd)) {
+			try {
+				fs.accessSync(cmd, fs.constants.X_OK);
+			} catch (err) {
+				fs.chmodSync(cmd, fs.constants.S_IXUSR | fs.constants.S_IRUSR | fs.constants.S_IXGRP | fs.constants.S_IXOTH);
+			}
+			serverCommand = cmd;
+			break;
+		}
+	}
+	if (!serverCommand) {
+		vscode.window.showErrorMessage("Neither a bundled nor an installed backend could be found for this platform.  You may be able to solve this with `cargo install a2kit`.");
+		return;
+	}
 	context.subscriptions.push(vscode.workspace.registerNotebookSerializer('disk-image-notebook', new DiskImageProvider(), providerOptions));
 	const controller = new DiskImageController(); // must come after registering provider
 	context.subscriptions.push(controller.vs_controller);
@@ -76,34 +146,38 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 	deserializeNotebook(data: Uint8Array, token: vscode.CancellationToken): vscode.NotebookData | Thenable<vscode.NotebookData> {
 		const out = new vscode.NotebookCellOutput([]);
 		const img_hash = crypto.createHash('sha256').update(data).digest('hex');
-		try {
-			const vers = bin2txt(['-V'], undefined);
-			const matches = vers.match(/a2kit ([0-9]+)\.([0-9]+)\.([0-9]+)/);
-			if (!matches || matches?.length!=4) {
-				vscode.window.showErrorMessage("error getting a2kit version");
-			}
-			if (matches?.length == 4) {
-				const v = [parseInt(matches[1]), parseInt(matches[2]), parseInt(matches[3])];
-				if (v >= [3, 0, 0]) {
-					const mess = "a2kit 2.x is expected, found " + v[0] + "." + v[1] + "." + v[2];
-					vscode.window.showErrorMessage(mess);
-					out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
+		if (!serverCommand) {
+			out.items.push(vscode.NotebookCellOutputItem.text("ERROR: no backend"));
+		} else {
+			try {
+				const vers = bin2txt(['-V'], undefined);
+				const matches = vers.match(/a2kit ([0-9]+)\.([0-9]+)\.([0-9]+)/);
+				if (!matches || matches?.length != 4) {
+					vscode.window.showErrorMessage("error getting a2kit version");
 				}
-				if (v < [2, 7, 0]) {
-					const mess = "a2kit 2.7.0 is required, found " + v[0] + "." + v[1] + "." + v[2];
-					vscode.window.showErrorMessage(mess);
-					out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
+				if (matches?.length == 4) {
+					const v = [parseInt(matches[1]), parseInt(matches[2]), parseInt(matches[3])];
+					if (v >= [4, 0, 0]) {
+						const mess = "a2kit 3.x is expected, found " + v[0] + "." + v[1] + "." + v[2];
+						vscode.window.showErrorMessage(mess);
+						out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
+					}
+					if (v < [3, 0, 1]) {
+						const mess = "a2kit 3.0.1 is required, found " + v[0] + "." + v[1] + "." + v[2];
+						vscode.window.showErrorMessage(mess);
+						out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
+					}
 				}
+			} catch (error) {
+				if (error instanceof Error)
+					vscode.window.showErrorMessage("error getting a2kit version: " + error.message);
 			}
-		} catch (error) {
-			if (error instanceof Error)
-				vscode.window.showErrorMessage("error getting a2kit version: " + error.message);
-		}
-		try {
-			const root_dir = bin2txt(['dir'], Buffer.from(data));
-			out.items.push(vscode.NotebookCellOutputItem.text(root_dir));
-		} catch (error) {
-			out.items.push(vscode.NotebookCellOutputItem.text("could not solve file system, but track solutions may exist"));
+			try {
+				const root_dir = bin2txt(['dir'], Buffer.from(data));
+				out.items.push(vscode.NotebookCellOutputItem.text(root_dir));
+			} catch (error) {
+				out.items.push(vscode.NotebookCellOutputItem.text("could not solve file system, but track solutions may exist"));
+			}
 		}
 		const tip = new vscode.NotebookCellOutput([
 			vscode.NotebookCellOutputItem.text("Tip: create a code cell, type `help`, hit `shift-enter`")
@@ -139,7 +213,7 @@ class DiskImageController {
 	stat_map = new Map<string, interactive.Stat>();
 	stale_map = new Map<string, number>();
 	constructor() {
-		//console.log("construct disk image controller");
+		console.log("using backend " + serverCommand);
 		this.vs_controller = vscode.notebooks.createNotebookController('disk-image-id', 'disk-image-notebook', 'Disk Image', this.execute.bind(this));
 		this.vs_messager = vscode.notebooks.createRendererMessaging('disk-image-interactive');
 		this.vs_controller.onDidChangeSelectedNotebooks((event: {readonly notebook: vscode.NotebookDocument,readonly selected:boolean}) => {
@@ -221,8 +295,8 @@ class DiskImageController {
 					const cpm_corrected = tree.file_system == "cpm" ? util.cpmForm(new_path_actual) : new_path_actual;
 					const res = bin2txt(["get", "-f", cpm_corrected, "-t", "any"], img_buf);
 					const fimg = new FileImage(res);
-					const res2 = fimg.getText(cpm_corrected, img_buf);
-					this.vs_messager.postMessage(new xp_mess.ReturnedFile(new_path_actual, res2, fimg.img.fs_type, messg.img_hash));
+					const [objCode,content] = fimg.getText(cpm_corrected, img_buf);
+					this.vs_messager.postMessage(new xp_mess.ReturnedFile(new_path_actual, content, objCode, fimg.img.fs_type, messg.img_hash));
 				}
 			} else if (xp_mess.OpenFile.test(event.message)) {
 				const messg: xp_mess.OpenFile = event.message;
@@ -238,8 +312,29 @@ class DiskImageController {
 						lang = 'integerbasic';
 					if ((typ & 0x7f) == 0x02)
 						lang = 'applesoft'
+				} else if (messg.fs == "a2 pascal") {
+					if ((messg.typ == "0300"))
+						lang = 'pascal';
 				}
 				vscode.workspace.openTextDocument({content: messg.content, language: lang}).then(doc => {
+					vscode.window.showTextDocument(doc);
+				});
+			} else if (xp_mess.OpenDasm.test(event.message)) {
+				const mess: xp_mess.OpenDasm = event.message;
+				let proc;
+				if (mess.xc == 0) {
+					proc = "6502";
+				} else if (mess.xc == 1) {
+					proc = "65c02";
+				} else {
+					proc = "65816";
+				}
+				let load_addr = mess.objectCode.load_addr;
+				if (load_addr == 0) {
+					load_addr = 8192; // probably a system file
+				}
+				const res = bin2txt(["dasm", "-p", proc, "--mx", mess.mx, "--org", load_addr.toString()], Buffer.from(mess.objectCode.code));
+				vscode.workspace.openTextDocument({ content: res, language: "merlin6502" }).then(doc => {
 					vscode.window.showTextDocument(doc);
 				});
 			}
@@ -395,7 +490,7 @@ class DiskImageController {
 						}
 						const res = bin2txt(args, img_buf);
 						out_cells.push(vscode.NotebookCellOutputItem.text(res));
-					} else if (cmd.length == 1 && cmd[0] == "tree" || cmd.length == 2 && cmd[0] == "tree" && cmd[1] == "--meta") {
+					} else if (cmd.length > 0 && cmd.length < 5 && cmd[0] == "tree") {
 						const res = bin2txt(cmd, img_buf);
 						out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
 					} else if (cmd.length == 2 && cmd[0] == "cd") {
@@ -432,8 +527,32 @@ class DiskImageController {
 						const file_path = img_path ? img_path + path_arg : "" + path_arg;
 						const res = bin2txt([cmd[0], "-f", file_path, "-t", "any"], img_buf);
 						const fimg = new FileImage(res);
-						const res2 = fimg.getText(file_path, img_buf);
-						out_cells.push(vscode.NotebookCellOutputItem.text(res2));
+						const content = fimg.getText(file_path, img_buf)[1];
+						out_cells.push(vscode.NotebookCellOutputItem.text(content));
+					} else if (cmd.length == 2 && cmd[0] == "glob") {
+						const content = bin2txt([cmd[0], "-f", cmd[1], "--indent", "4"], img_buf);
+						out_cells.push(vscode.NotebookCellOutputItem.text(content, "text/x-json"));
+					} else if (cmd.length == 3 && cmd[0] == "dasm") {
+						const valid_procs = ["6502","65c02","65816-00","65816-01","65816-10","65816-11"];
+						const proc_arg = cmd[1];
+						if (valid_procs.includes(proc_arg)) {
+							const path_arg = util.trailingArgWithSpaces(line, 2);
+							const proc_parts = proc_arg.split("-");
+							const proc = proc_parts[0];
+							const mx = proc_parts.length > 1 ? proc_parts[1] : "00";
+							const file_path = img_path ? img_path + path_arg : "" + path_arg;
+							const fimg_str = bin2txt(["get", "-f", file_path, "-t", "any"], img_buf);
+							const fimg = new FileImage(fimg_str);
+							const objCode = fimg.getObjectCode(file_path, img_buf);
+							let load_addr = objCode.load_addr;
+							if (load_addr == 0) {
+								load_addr = 8192; // probably a system file
+							}
+							const content = bin2txt(["dasm", "-p", proc, "--mx", mx, "--org", load_addr.toString()], Buffer.from(objCode.code));
+							out_cells.push(vscode.NotebookCellOutputItem.text(content));
+						} else {
+							out_cells.push(vscode.NotebookCellOutputItem.text("processor must be one of " + valid_procs + "\n"));
+						}
 					} else if (cmd.length > 1 && cmd[0] == "clone") {
 						const path_arg = util.trailingArgWithSpaces(line, 1);
 						const file_path = img_path ? img_path + path_arg : "" + path_arg;
@@ -455,9 +574,25 @@ class DiskImageController {
 					} else if (cmd.length == 1 && cmd[0] == "meta") {
 						const res = bin2txt(["get", "-t", "meta"], img_buf);
 						out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
+					} else if (cmd.length == 2 && cmd[0] == "stat") {
+						const indent = parseInt(cmd[1]);
+						if (!isNaN(indent)) {
+							const res = bin2txt(["stat", "--indent", indent.toString()], img_buf);
+							out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
+						} else {
+							out_cells.push(vscode.NotebookCellOutputItem.text("argument did not parse as integer"));
+						}
 					} else if (cmd.length == 1 && cmd[0] == "stat") {
 						const res = bin2txt(["stat"], img_buf);
 						out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
+					} else if (cmd.length == 2 && cmd[0] == "geometry") {
+						const indent = parseInt(cmd[1]);
+						if (!isNaN(indent)) {
+							const res = bin2txt(["geometry", "--indent", indent.toString()], img_buf);
+							out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
+						} else {
+							out_cells.push(vscode.NotebookCellOutputItem.text("argument did not parse as integer"));
+						}
 					} else if (cmd.length == 1 && cmd[0] == "geometry") {
 						const res = bin2txt(["geometry"], img_buf);
 						out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));

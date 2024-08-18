@@ -8,7 +8,7 @@ export class MessageBase {
         this.command = (<any>this.constructor).id;
         this.img_hash = hash;
     }
-    static test(obj: any) {
+    static test(obj: MessageBase) {
         return obj.command && obj.command == this.id;
     }
 }

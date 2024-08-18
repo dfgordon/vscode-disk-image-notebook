@@ -39,19 +39,19 @@ export const TrueNeutral: ThemeColors = {
 }
 
 export const AmberDays: ThemeColors = {
-    link: '#d0a000',
+    link: '#d08000',
 
     buttonBorder: 'none',
     buttonBackground: '#383018',
-    buttonForeground: '#d0a000',
+    buttonForeground: '#d08000',
 
     radioOnBorder: '1px solid black',
-    radioOnBackground: '#706030',
+    radioOnBackground: '#785828',
     radioOnForeground: '#ffffff',
 
     radioOffBorder: '1px solid black',
     radioOffBackground: '#383018',
-    radioOffForeground: '#d0a000',
+    radioOffForeground: '#d08000',
 
     radioDisabledBorder: '1px solid black',
     radioDisabledBackground: '#383018',
