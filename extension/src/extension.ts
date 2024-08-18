@@ -71,51 +71,12 @@ const help_string =
 * Notebook cannot be saved, for write access or scripting use `a2kit` directly\n\
 * Notebook API does not let us stop you from saving.  If you do, the disk image is simply written back without change.\n";
 
-/** convert arch-platform to rust convention */
-function targetTriple(): string[] {
-	const ans = [];
-	
-	// CPU part
-	if (os.arch() == "arm64") {
-		ans.push("aarch64");
-	} else if (os.arch() == "x64") {
-		ans.push("x86_64");
-	} else {
-		ans.push("unknown");
-	}
-
-	// Vendor part
-	if (os.platform() == "darwin") {
-		ans.push("apple");
-	} else if (os.platform() == "linux") {
-		ans.push("unknown");
-	} else if (os.platform() == "win32") {
-		ans.push("pc");
-	} else {
-		ans.push("unknown");
-	}
-
-	// OS-ABI part
-	if (os.platform() == "darwin") {
-		ans.push("darwin");
-	} else if (os.platform() == "linux") {
-		ans.push("linux-musl");
-	} else if (os.platform() == "win32") {
-		ans.push("windows-msvc.exe");
-	} else {
-		ans.push("unknown");
-	}
-
-	return ans;
-}
-
 function getExecutableNames(context: vscode.ExtensionContext): string[] {
 	const ans = [];
-	const [cpu, vendor, opSys] = targetTriple();
-	const bundled = "a2kit" + "-" + cpu + "-" + vendor + "-" + opSys;
-	ans.push(context.asAbsolutePath(path.join('server', bundled)));
-	const external = "a2kit" + (opSys.endsWith(".exe") ? ".exe" : "");
-	ans.push(path.join(os.homedir(),".cargo","bin",external));
+	const targetFolder = os.platform() + "-" + os.arch();
+	const exe = os.platform() == "win32" ? "a2kit.exe" : "a2kit";
+	ans.push(context.asAbsolutePath(path.join('server', targetFolder, exe)));
+	ans.push(path.join(os.homedir(),".cargo","bin",exe));
 	return ans;
 }
 
