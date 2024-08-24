@@ -3,7 +3,7 @@
 	"displayName": "Disk Image Notebook",
 	"description": "Look inside disk images",
 	"icon": "disk-image-icon.png",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -80,15 +80,15 @@
 		"test": "node ./extension/out/test/runTest.js"
 	},
 	"devDependencies": {
-		"@types/node": "18.x",
+		"@types/node": "20.x",
 		"@types/vscode": "^1.85.0",
-		"@typescript-eslint/eslint-plugin": "^6.16.0",
-		"@typescript-eslint/parser": "^6.16.0",
-		"esbuild": "^0.19.9",
-		"eslint": "8.56.0",
-		"rimraf": "^5.0.1",
+		"@typescript-eslint/eslint-plugin": "^8.2.0",
+		"@typescript-eslint/parser": "^8.2.0",
+		"esbuild": "^0.23.1",
+		"eslint": "9.9.1",
+		"rimraf": "^6.0.1",
 		"run-script-os": "^1.1.6",
-		"typescript": "^5.3.2",
-		"@vscode/test-electron": "^2.3.8"
+		"typescript": "^5.5.4",
+		"@vscode/test-electron": "^2.4.1"
 	}
 }

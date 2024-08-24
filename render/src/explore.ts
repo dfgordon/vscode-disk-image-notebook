@@ -278,7 +278,7 @@ export function Explore(props: ExploreProps) {
             ${file_header(props.stat.fs_name, path)}
         </span>
         <span style=${{ 'padding-right': '10px' }}>
-            ${themeButton({ name: "🗁", color_theme: props.color_theme, callback: onOpen })}
+            ${themeButton({ name: "\u{1f4c2}", color_theme: props.color_theme, callback: onOpen })}
         </span>
         ${DasmMenu({ name: "DASM", color_theme: props.color_theme, callback: onDasm })}
         </div>
@@ -293,7 +293,7 @@ export function Explore(props: ExploreProps) {
         <div style=${{ 'padding-top': '10px', clear: 'left' }}>
         ${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}
         <span style=${{ 'padding-left': '10px', 'padding-right': '10px' }}>${file_header(props.stat.fs_name, path)}</span>
-        ${themeButton({ name: "🗁", color_theme: props.color_theme, callback: onOpen })}
+        ${themeButton({ name: "\u{1f4c2}", color_theme: props.color_theme, callback: onOpen })}
         </div>
         <div>
         <pre>
