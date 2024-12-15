@@ -3,30 +3,25 @@ import { useState, useRef } from 'preact/hooks'
 import { VNode } from 'preact';
 import { html } from 'htm/preact';
 import * as decode from './decode.js';
-import * as interactive from '../../messages/src/base.js';
-import * as xp from '../../messages/src/explore.js';
-import * as theme from '../../messages/src/themes.js';
+import * as mess_base from '../../messages/src/base.js';
+import * as mess_xp from '../../messages/src/explore.js';
+import * as mess_theme from '../../messages/src/themes.js';
+import { ThemeButtonProps, DasmMenu, PostOpenDasm } from './dasm.js';
 
 export type ExploreProps = {
     img_hash: string,
     ctx: RendererContext<any>,
     root_path: string,
-    root_files: interactive.DirectoryRow[],
+    root_files: mess_base.DirectoryRow[],
     start_path: string,
-    start_files: interactive.DirectoryRow[],
-    stat: interactive.Stat,
-    color_theme: theme.ThemeColors
+    start_files: mess_base.DirectoryRow[],
+    stat: mess_base.Stat,
+    color_theme: mess_theme.ThemeColors
 };
 
 type UserSelectProps = {
     starting_user: string,
     users: string[],
-    callback: (event: Event) => void
-};
-
-type ThemeButtonProps = {
-    name: string,
-    color_theme: theme.ThemeColors,
     callback: (event: Event) => void
 };
 
@@ -87,85 +82,6 @@ function file_header(fs: string,path: string): VNode {
     }
 }
 
-function DasmMenu(props: ThemeButtonProps) {
-    function highlight(style: CSSStyleDeclaration) {
-        style.backgroundColor = props.color_theme.radioOnBackground;
-        style.color = props.color_theme.radioOnForeground;
-    }
-    function unhighlight(style: CSSStyleDeclaration) {
-        style.backgroundColor = props.color_theme.radioOffBackground;
-        style.color = props.color_theme.radioOffForeground;
-    }
-    // some better way?
-    const menu0 = useRef(null);
-    const highlight0 = () => highlight(menu0.current.style);
-    const unhighlight0 = () => unhighlight(menu0.current.style);
-    const menu1 = useRef(null);
-    const highlight1 = () => highlight(menu1.current.style);
-    const unhighlight1 = () => unhighlight(menu1.current.style);
-    const menu2 = useRef(null);
-    const highlight2 = () => highlight(menu2.current.style);
-    const unhighlight2 = () => unhighlight(menu2.current.style);
-    const menu3 = useRef(null);
-    const highlight3 = () => highlight(menu3.current.style);
-    const unhighlight3 = () => unhighlight(menu3.current.style);
-    const menu4 = useRef(null);
-    const highlight4 = () => highlight(menu4.current.style);
-    const unhighlight4 = () => unhighlight(menu4.current.style);
-    const menu5 = useRef(null);
-    const highlight5 = () => highlight(menu5.current.style);
-    const unhighlight5 = () => unhighlight(menu5.current.style);
-
-    const dropdown = useRef(null);
-    const showMenu = () => dropdown.current.style.display = "block";
-    const hideMenu = () => dropdown.current.style.display = "none";
-    const css_dropdown = {
-        position: 'relative',
-        display: 'inline-block'
-    };
-    const css_content = {
-        display: 'none',
-        position: 'absolute',
-        overflow: 'auto',
-        'z-index': 1,
-        'text-decoration': 'none',
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.buttonBackground,
-        color: props.color_theme.buttonForeground
-    };
-    const css_btn = {
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.buttonBackground,
-        color: props.color_theme.buttonForeground,
-        'text-decoration': 'none',
-        padding: '2px 8px',
-        cursor: 'pointer'
-    };
-    const css_item = {
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.radioDisabledBackground,
-        color: props.color_theme.radioOffForeground,
-        'text-decoration': 'none',
-        padding: '2px 8px',
-        cursor: 'pointer',
-        overflow: 'auto',
-        display: 'block',
-        'white-space': 'nowrap'
-    };
-    return html`
-    <div style=${css_dropdown} onMouseEnter=${showMenu} onMouseLeave=${hideMenu}>
-        <a href="#" style=${css_btn}>${props.name}</a>
-        <div ref=${dropdown} style=${css_content}>
-            <div><a href="#" ref=${menu0} style=${css_item} onMouseEnter=${highlight0} onMouseLeave=${unhighlight0} onClick=${props.callback}>6502</a></div>
-            <div><a href="#" ref=${menu1} style=${css_item} onMouseEnter=${highlight1} onMouseLeave=${unhighlight1} onClick=${props.callback}>65c02</a></div>
-            <div><a href="#" ref=${menu2} style=${css_item} onMouseEnter=${highlight2} onMouseLeave=${unhighlight2} onClick=${props.callback}>65816 mx=00</a></div>
-            <div><a href="#" ref=${menu3} style=${css_item} onMouseEnter=${highlight3} onMouseLeave=${unhighlight3} onClick=${props.callback}>65816 mx=01</a></div>
-            <div><a href="#" ref=${menu4} style=${css_item} onMouseEnter=${highlight4} onMouseLeave=${unhighlight4} onClick=${props.callback}>65816 mx=10</a></div>
-            <div><a href="#" ref=${menu5} style=${css_item} onMouseEnter=${highlight5} onMouseLeave=${unhighlight5} onClick=${props.callback}>65816 mx=11</a></div>
-        </div>
-    </div>`;
-}
-
 function user_selection(props: UserSelectProps) {
     const onChange = (event: Event) => {
         if (event.target instanceof HTMLSelectElement) {
@@ -209,13 +125,13 @@ export function Explore(props: ExploreProps) {
     const [path, setPath] = useState(props.start_path);
     const [user, setUser] = useState(props.stat.users.length > 0 ? props.stat.users[0] : "0");
     props.ctx.onDidReceiveMessage(messg => {
-        if (xp.ReturnedSubdirectory.test(messg) && messg.img_hash == props.img_hash) {
-            const tm: xp.ReturnedSubdirectory = messg;
+        if (mess_xp.ReturnedSubdirectory.test(messg) && messg.img_hash == props.img_hash) {
+            const tm: mess_xp.ReturnedSubdirectory = messg;
             setPath(tm.new_path);
             setRows(tm.rows);
             setDir(true);
-        } else if (xp.ReturnedFile.test(messg) && messg.img_hash == props.img_hash) {
-            const tm: xp.ReturnedFile = messg;
+        } else if (mess_xp.ReturnedFile.test(messg) && messg.img_hash == props.img_hash) {
+            const tm: mess_xp.ReturnedFile = messg;
             setPath(tm.new_path);
             setContent(tm.content);
             setObjectCode(tm.objectCode);
@@ -229,7 +145,7 @@ export function Explore(props: ExploreProps) {
             if (props.stat.fs_name == "cpm" && path=="/") {
                 setUser(newFile);
             }
-            props.ctx.postMessage(new xp.ChangeDirectory(path, newFile, props.img_hash));
+            props.ctx.postMessage(new mess_xp.ChangeDirectory(path, newFile, props.img_hash));
         }
     }
     const onBack = (event: Event) => {
@@ -238,35 +154,23 @@ export function Explore(props: ExploreProps) {
             if (props.stat.fs_name == "cpm" && match) {
                 setUser(match[1]);
             }
-            props.ctx.postMessage(new xp.ChangeDirectory(path, "..", props.img_hash));
+            props.ctx.postMessage(new mess_xp.ChangeDirectory(path, "..", props.img_hash));
         }
     }
     const onOpen = (event: Event) => {
         if (event.target instanceof HTMLElement) {
-            props.ctx.postMessage(new xp.OpenFile(content, props.stat.fs_name, typ, props.img_hash));
+            props.ctx.postMessage(new mess_xp.OpenFile(content, props.stat.fs_name, typ, props.img_hash));
         }
     }
     const onDasm = (event: Event) => {
-        if (event.target instanceof HTMLElement) {
-            if (event.target.textContent == "6502") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 0, "11", props.img_hash));
-            } else if (event.target.textContent == "65c02") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 1, "11", props.img_hash));
-            } else if (event.target.textContent == "65816 mx=00") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "00", props.img_hash));
-            } else if (event.target.textContent == "65816 mx=01") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "01", props.img_hash));
-            } else if (event.target.textContent == "65816 mx=10") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "10", props.img_hash));
-            } else if (event.target.textContent == "65816 mx=11") {
-                props.ctx.postMessage(new xp.OpenDasm(objectCode, 2, "11", props.img_hash));
-            }
+        if (event.target instanceof HTMLElement && objectCode) {
+            PostOpenDasm(props.ctx, objectCode, event.target.textContent, props.img_hash);
         }
     }
     const onUser = (event: Event) => {
         if (event.target instanceof HTMLSelectElement) {
             setUser(event.target.value);
-            props.ctx.postMessage(new xp.ChangeDirectory("/", event.target.value, props.img_hash));
+            props.ctx.postMessage(new mess_xp.ChangeDirectory("/", event.target.value, props.img_hash));
         }
     }
 

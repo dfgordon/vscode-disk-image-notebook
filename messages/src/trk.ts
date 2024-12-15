@@ -1,4 +1,4 @@
-import { MessageBase } from './base';
+import { MessageBase, ObjectCode } from './base';
 
 export class LoadNibbles extends MessageBase {
     static id = "dimg-LoadNibbles";
@@ -30,18 +30,22 @@ export class LoadBlock extends MessageBase {
 export class ReturnedSector extends MessageBase {
     static id = "dimg-returnedSector";
     hex: string;
-    constructor(hex: string, hash: string) {
+    objectCode: ObjectCode | null;
+    constructor(hex: string, objectCode: ObjectCode | null, hash: string) {
         super(hash);
         this.hex = hex;
+        this.objectCode = objectCode;
     }
 }
 
 export class ReturnedBlock extends MessageBase {
     static id = "dimg-returnedBlock";
     hex: string;
-    constructor(hex: string, hash: string) {
+    objectCode: ObjectCode | null;
+    constructor(hex: string, objectCode: ObjectCode | null, hash: string) {
         super(hash);
         this.hex = hex;
+        this.objectCode = objectCode;
     }
 }
 

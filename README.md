@@ -2,8 +2,6 @@
 
 Click on a disk image in your project tree to see the root directory in the file system's native style.  Dig deeper using either the interactive mode or by entering commands in code cells.  For the present, this is designed to never modify any disk image.
 
-The backend is now bundled for common platforms, no separate installation is required.  If your platform is not supported directly see below.
-
 ## Demo
 
 <img src="dimg.gif" alt="session capture"/>

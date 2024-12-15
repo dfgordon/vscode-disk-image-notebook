@@ -2,12 +2,13 @@
 	"name": "vscode-disk-image-messages",
 	"displayName": "Disk Image Messages",
 	"description": "Messages for disk image notebooks",
-	"version": "2.0.1",
+	"version": "3.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
 		"url": "https://github.com/dfgordon/vscode-disk-image-notebook"
 	},
+	"type": "commonjs",
 	"devDependencies": {
 		"@types/node": "20.x",
 		"typescript": "^5.5.4"

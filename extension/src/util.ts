@@ -165,3 +165,20 @@ export function hexDump(dat: Buffer,baseAddr: number) : string {
     }
     return content;
 }
+
+/**
+ * Parse a hex dump.  Expected row format is `XXXX: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX`.
+ * Trailing characters at the end of each row are OK, but otherwise format needs to be exact.
+ * @param hexstr hex dump string
+ * @returns array of numbers
+ */
+export function parseHexDump(hexstr: string): Buffer {
+    const ans: number[] = [];
+    for (const line of hexstr.split(/\r?\n/)) {
+        const cols = line.substring(0, 53).split(/ +/);
+        for (let i = 1; i < cols.length; i++) {
+            ans.push(parseInt(cols[i],16))
+        }
+    }
+    return Buffer.from(Uint8Array.from(ans));
+}

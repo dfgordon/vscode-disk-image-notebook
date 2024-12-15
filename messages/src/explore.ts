@@ -1,13 +1,4 @@
-import { MessageBase, DirectoryRow } from './base';
-
-export class ObjectCode {
-    load_addr: number;
-    code: Uint8Array;
-    constructor(load_addr: number, code: Uint8Array) {
-        this.load_addr = load_addr;
-        this.code = code;
-    }
-}
+import { MessageBase, DirectoryRow, ObjectCode } from './base';
 
 export class ChangeDirectory extends MessageBase {
     static id = "dimg-ChangeDirectory";
@@ -56,18 +47,5 @@ export class OpenFile extends MessageBase {
         this.content = content;
         this.fs = fs;
         this.typ = typ;
-    }
-}
-
-export class OpenDasm extends MessageBase {
-    static id = "dimg-OpenDasm";
-    objectCode: ObjectCode;
-    xc: number;
-    mx: string;
-    constructor(objectCode: ObjectCode, xc: number, mx: string, hash: string) {
-        super(hash);
-        this.objectCode = objectCode;
-        this.xc = xc;
-        this.mx = mx;
     }
 }

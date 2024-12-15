@@ -1,10 +1,12 @@
 import type { RendererContext } from 'vscode-notebook-renderer';
 import { useState } from 'preact/hooks'
 import { html } from 'htm/preact';
-import * as base from '../../messages/src/base.js';
-import * as trk_mess from '../../messages/src/trk.js';
+import * as mess_base from '../../messages/src/base.js';
+import * as mess_trk from '../../messages/src/trk.js';
+import * as mess_theme from '../../messages/src/themes.js';
+import { DasmMenu, PostOpenDasm } from './dasm.js';
 
-export function StartingSector(chs_map: [[number,number,number]]): number {
+export function StartingSector(chs_map: [[number, number, number]]): number {
     let sec = chs_map[0][2];
     for (const chs of chs_map) {
         if (chs[2] < sec)
@@ -15,21 +17,23 @@ export function StartingSector(chs_map: [[number,number,number]]): number {
 
 export type DisplaySectorProps = {
     img_hash: string,
-    geometry: base.Geometry,
+    geometry: mess_base.Geometry,
     ctx: RendererContext<any>,
     startingDisplay: string,
+    color_theme: mess_theme.ThemeColors
 };
 
 export type DisplayBlockProps = {
     img_hash: string,
-    stat: base.Stat,
+    stat: mess_base.Stat,
     ctx: RendererContext<any>,
-    startingDisplay: string
+    startingDisplay: string,
+    color_theme: mess_theme.ThemeColors
 };
 
 export type DisplayNibbleProps = {
     img_hash: string,
-    geometry: base.Geometry,
+    geometry: mess_base.Geometry,
     ctx: RendererContext<any>,
     startingDisplay: string
 };
@@ -41,7 +45,7 @@ export function DisplayNibbles(props: DisplayNibbleProps) {
     const [head, SetHead] = useState(0);
     const [hex, SetHex] = useState(props.startingDisplay);
     props.ctx.onDidReceiveMessage(messg => {
-        if (trk_mess.ReturnedNibbles.test(messg) && messg.img_hash == props.img_hash) {
+        if (mess_trk.ReturnedNibbles.test(messg) && messg.img_hash == props.img_hash) {
             SetHex(messg.hex);
         }
     });
@@ -53,7 +57,7 @@ export function DisplayNibbles(props: DisplayNibbleProps) {
             SetTrk(updated);
             SetCyl(updatedCyl);
             SetHead(updatedHead);
-            props.ctx.postMessage(new trk_mess.LoadNibbles(updatedCyl, updatedHead, props.img_hash));
+            props.ctx.postMessage(new mess_trk.LoadNibbles(updatedCyl, updatedHead, props.img_hash));
         }
     }
     return html`
@@ -80,9 +84,12 @@ export function DisplaySector(props: DisplaySectorProps) {
     const [head, SetHead] = useState(0);
     const [sec, SetSec] = useState(StartingSector(props.geometry.tracks[0].chs_map));
     const [hex, SetHex] = useState(props.startingDisplay);
+    const [objectCode, setObjectCode] = useState(null);
     props.ctx.onDidReceiveMessage(messg => {
-        if (trk_mess.ReturnedSector.test(messg) && messg.img_hash == props.img_hash) {
-            SetHex(messg.hex);
+        if (mess_trk.ReturnedSector.test(messg) && messg.img_hash == props.img_hash) {
+            const tm: mess_trk.ReturnedSector = messg;
+            SetHex(tm.hex);
+            setObjectCode(tm.objectCode);
         }
     });
     const onTrk = (event: Event) => {
@@ -93,14 +100,19 @@ export function DisplaySector(props: DisplaySectorProps) {
             SetTrk(updated);
             SetCyl(updatedCyl);
             SetHead(updatedHead);
-            props.ctx.postMessage(new trk_mess.LoadSector(updatedCyl, updatedHead, sec, props.img_hash));
+            props.ctx.postMessage(new mess_trk.LoadSector(updatedCyl, updatedHead, sec, props.img_hash));
         }
     }
     const onSec = (event: Event) => {
         if (event.target instanceof HTMLInputElement) {
             const updated = event.target.valueAsNumber;
             SetSec(updated);
-            props.ctx.postMessage(new trk_mess.LoadSector(cyl, head, updated, props.img_hash));
+            props.ctx.postMessage(new mess_trk.LoadSector(cyl, head, updated, props.img_hash));
+        }
+    }
+    const onDasm = (event: Event) => {
+        if (event.target instanceof HTMLElement && objectCode) {
+            PostOpenDasm(props.ctx, objectCode, event.target.textContent, props.img_hash);
         }
     }
     return html`
@@ -110,6 +122,7 @@ export function DisplaySector(props: DisplaySectorProps) {
           <td>Track</td><td><input type="number" min=0 max=${props.geometry.tracks.length - 1} value=${trk} onInput=${onTrk} ></input></td>
           <td>Sector</td><td><input type="number" min=0 max=100 value=${sec} onInput=${onSec}></input></td>
           <td>(CHS ${cyl},${head},${sec})</td>
+          <td>${DasmMenu({ name: "DASM", color_theme: props.color_theme, callback: onDasm })}</td>
         </tr>
       </table>
       </div>
@@ -125,21 +138,30 @@ export function DisplayBlock(props: DisplayBlockProps) {
     //console.log("enter block renderer");
     const [block, SetBlock] = useState(props.stat.block_beg);
     const [hex, SetHex] = useState(props.startingDisplay);
+    const [objectCode, setObjectCode] = useState(null);
     props.ctx.onDidReceiveMessage(messg => {
-        if (trk_mess.ReturnedBlock.test(messg) && messg.img_hash == props.img_hash) {
-            SetHex(messg.hex);
+        if (mess_trk.ReturnedBlock.test(messg) && messg.img_hash == props.img_hash) {
+            const tm: mess_trk.ReturnedBlock = messg;
+            SetHex(tm.hex);
+            setObjectCode(tm.objectCode);
         }
     });
     const onBlock = (event: Event) => {
         if (event.target instanceof HTMLInputElement) {
             const updated = event.target.valueAsNumber;
             SetBlock(updated);
-            props.ctx.postMessage(new trk_mess.LoadBlock(updated, props.img_hash));
+            props.ctx.postMessage(new mess_trk.LoadBlock(updated, props.img_hash));
+        }
+    }
+    const onDasm = (event: Event) => {
+        if (event.target instanceof HTMLElement && objectCode) {
+            PostOpenDasm(props.ctx, objectCode, event.target.textContent, props.img_hash);
         }
     }
     return html`
       <div style=${{ 'padding-top': '10px', clear: 'left' }}>
       <span>Block</span> <input type="number" min=${props.stat.block_beg} max=${props.stat.block_end - 1} value=${block} onInput=${onBlock} ></input>
+      <span style=${{ 'padding-left': '10px' }}>${DasmMenu({ name: "DASM", color_theme: props.color_theme, callback: onDasm })}</span>
       </div>
       <div>
       <pre>

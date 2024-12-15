@@ -1,6 +1,6 @@
 import { spawnSync, SpawnSyncReturns } from 'child_process';
 import { hexDump } from './util.js'
-import * as xp from '../../messages/src/explore.js';
+import { ObjectCode } from '../../messages/src/base.js';
 import { serverCommand } from './extension.js';
 
 const A2DosMap = new Map<string, string>([
@@ -180,7 +180,7 @@ export class FileImage {
 	 * @returns [maybe object code, string for display]
 	 * @throws Error
 	 * */
-	getText(path: string, stdin: Buffer): [xp.ObjectCode | null, string] {
+	getText(path: string, stdin: Buffer): [ObjectCode | null, string] {
 		const typ = this.getBestType();
 		if (typ == "txt") {
 			if (this.img.file_system == "prodos" && this.img.aux != "0000") {
@@ -206,7 +206,7 @@ export class FileImage {
 				if (!tentative_string.includes('\ufffd'))
 					return [null, tentative_string];
 			}
-			const objCode = new xp.ObjectCode(baseAddr, dat);
+			const objCode = new ObjectCode(baseAddr, dat);
 			return [objCode, hexDump(dat, baseAddr)];
 		}
 	}
@@ -226,10 +226,10 @@ export class FileImage {
 	/** Get ObjectCode type using fimg and disk both
 	 * @throws Error
 	 * */
-	getObjectCode(path: string, stdin: Buffer): xp.ObjectCode {
+	getObjectCode(path: string, stdin: Buffer): ObjectCode {
 		const baseAddr = this.getLoadAddr();
 		const dat = bin2bin(["get", "-f", path, "-t", "bin"], stdin);
-		return new xp.ObjectCode(baseAddr, dat);
+		return new ObjectCode(baseAddr, dat);
 	}
 }
 

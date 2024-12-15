@@ -195,11 +195,11 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
                 else if (bak == dpro[1] && trk[i] == dpro[2]) mnemonics += ":";
                 // address epilog
                 else if (trk[i] == aepi[0] && fwd == aepi[1]) mnemonics += ":";
-                else if (bak == aepi[0] && trk[i] == aepi[1]) mnemonics += ")";
+                else if (bak == aepi[0] && trk[i] == aepi[1]) mnemonics += ":";
                 else if (bak == aepi[1]) mnemonics += ")";
                 // data epilog
                 else if (trk[i] == depi[0] && fwd == depi[1]) mnemonics += ":";
-                else if (bak == depi[0] && trk[i] == depi[1]) mnemonics += ")";
+                else if (bak == depi[0] && trk[i] == depi[1]) mnemonics += ":";
                 else if (bak == depi[1]) mnemonics += ")";
                 else if (trk[i] == 0xd5) mnemonics += "R";
                 else if (trk[i] == 0xaa) mnemonics += "R";

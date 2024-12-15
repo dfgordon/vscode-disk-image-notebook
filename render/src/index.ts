@@ -4,10 +4,10 @@ import { useState } from 'preact/hooks'
 import { html } from 'htm/preact';
 import * as explore from './explore.js';
 import * as tracks from './tracks.js';
-import * as base from '../../messages/src/base.js';
-import * as trk_mess from '../../messages/src/trk.js';
-import * as xp_mess from '../../messages/src/explore.js';
-import * as theme from '../../messages/src/themes.js';
+import * as mess_base from '../../messages/src/base.js';
+import * as mess_trk from '../../messages/src/trk.js';
+import * as mess_xp from '../../messages/src/explore.js';
+import * as mess_theme from '../../messages/src/themes.js';
 
 type ChooserProps = {
   handler: (event: Event) => void,
@@ -15,19 +15,19 @@ type ChooserProps = {
   has_tracks: boolean,
   file_system: string | null,
   has_nibbles: boolean,
-  color_theme: theme.ThemeColors
+  color_theme: mess_theme.ThemeColors
 };
 
 type DisplayProps = {
   img_hash: string,
-  geometry: base.Geometry | null,
-  stat: base.Stat | null,
+  geometry: mess_base.Geometry | null,
+  stat: mess_base.Stat | null,
   ctx: RendererContext<any>,
   root_path: string | null,
-  root_files: base.DirectoryRow[] | null,
+  root_files: mess_base.DirectoryRow[] | null,
   start_path: string | null,
-  start_files: base.DirectoryRow[] | null,
-  color_theme: theme.ThemeColors
+  start_files: mess_base.DirectoryRow[] | null,
+  color_theme: mess_theme.ThemeColors
 };
 
 function ModeChooser(props: ChooserProps) {
@@ -83,7 +83,7 @@ function Display(props: DisplayProps) {
   const [mode, SetMode] = useState(props.stat ? "catalog" : "sector");
   props.ctx.onDidReceiveMessage(messg => {
     // TODO: can anything be done about this?
-    if (base.ReferencesWereDeleted.test(messg) && messg.img_hash == props.img_hash) {
+    if (mess_base.ReferencesWereDeleted.test(messg) && messg.img_hash == props.img_hash) {
       console.log(props.stat.fs_name + " label " + props.stat.label + " received deletion notice");
     }
   });
@@ -93,13 +93,13 @@ function Display(props: DisplayProps) {
       //console.log("mode change "+updated);
       SetMode(updated);
       if (updated == "catalog") {
-        props.ctx.postMessage(new xp_mess.ChangeDirectory(props.root_path, "", props.img_hash));
+        props.ctx.postMessage(new mess_xp.ChangeDirectory(props.root_path, "", props.img_hash));
       } else if (updated == "block") {
-        props.ctx.postMessage(new trk_mess.LoadBlock(props.stat.block_beg, props.img_hash));
+        props.ctx.postMessage(new mess_trk.LoadBlock(props.stat.block_beg, props.img_hash));
       } else if (updated == "sector") {
-        props.ctx.postMessage(new trk_mess.LoadSector(0, 0, tracks.StartingSector(props.geometry.tracks[0].chs_map), props.img_hash));
+        props.ctx.postMessage(new mess_trk.LoadSector(0, 0, tracks.StartingSector(props.geometry.tracks[0].chs_map), props.img_hash));
       } else if (updated == "nibble") {
-        props.ctx.postMessage(new trk_mess.LoadNibbles(0, 0, props.img_hash));
+        props.ctx.postMessage(new mess_trk.LoadNibbles(0, 0, props.img_hash));
       }
     }
   }
@@ -131,7 +131,8 @@ function Display(props: DisplayProps) {
       img_hash: props.img_hash,
       geometry: props.geometry,
       startingDisplay: "Choose Sector",
-      ctx: props.ctx
+      ctx: props.ctx,
+      color_theme: props.color_theme
     };
     return html`
     ${h(ModeChooser, chooserProps)}
@@ -142,7 +143,8 @@ function Display(props: DisplayProps) {
       img_hash: props.img_hash,
       stat: props.stat,
       startingDisplay: "Choose Block",
-      ctx: props.ctx
+      ctx: props.ctx,
+      color_theme: props.color_theme
     }
     return html`
     ${h(ModeChooser, chooserProps)}
@@ -164,7 +166,7 @@ function Display(props: DisplayProps) {
 
 export const activate: ActivationFunction = context => ({
   renderOutputItem(data, element) {
-    const messg: base.CreateInteractive = data.json();
+    const messg: mess_base.CreateInteractive = data.json();
     const props: DisplayProps = {
       img_hash: messg.img_hash,
       geometry: messg.geometry,

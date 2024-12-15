@@ -13,6 +13,28 @@ export class MessageBase {
     }
 }
 
+export class ObjectCode {
+    load_addr: number;
+    code: Uint8Array;
+    constructor(load_addr: number, code: Uint8Array) {
+        this.load_addr = load_addr;
+        this.code = code;
+    }
+}
+
+export class OpenDasm extends MessageBase {
+    static id = "dimg-OpenDasm";
+    objectCode: ObjectCode;
+    xc: number;
+    mx: string;
+    constructor(objectCode: ObjectCode, xc: number, mx: string, hash: string) {
+        super(hash);
+        this.objectCode = objectCode;
+        this.xc = xc;
+        this.mx = mx;
+    }
+}
+
 export interface Stat {
     fs_name: string,
     label: string,

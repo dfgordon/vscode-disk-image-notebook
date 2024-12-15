@@ -3,12 +3,13 @@
 	"displayName": "Disk Image Notebook",
 	"description": "Look inside disk images",
 	"icon": "disk-image-icon.png",
-	"version": "2.0.1",
+	"version": "3.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
 		"url": "https://github.com/dfgordon/vscode-disk-image-notebook"
 	},
+	"type": "commonjs",
 	"engines": {
 		"vscode": "^1.85.0"
 	},
