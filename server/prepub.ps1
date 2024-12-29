@@ -39,6 +39,7 @@ if ($platform -eq "win32-x64") {
 	$server = "aarch64-apple-darwin"
 }
 
+# This doesn't yet work on the raw CI output, we have to manually extract two levels of zip
 $srcPath = $home + "/Downloads/result-" + $server + "/" + "a2kit-" + $server
 $srcPath = Get-ChildItem (Get-ChildItem ($srcPath + "-*[0-9a-f]"))
 Write-Output $srcPath

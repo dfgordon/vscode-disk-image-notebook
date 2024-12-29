@@ -5,13 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.0.0] - 2024-12-29
+
+### Fixes
+
+* Eliminate unreasonable consumption of processor cycles
+    - but we still have unexplained hesitations on arm64
 
 ### New Features
 
 * Better track, sector, and block views
 * More robust against simple copy protections
-* Some performance problems have been solved
 
 ### Breaking Changes
 
