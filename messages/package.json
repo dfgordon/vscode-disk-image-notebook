@@ -2,7 +2,7 @@
 	"name": "vscode-disk-image-messages",
 	"displayName": "Disk Image Messages",
 	"description": "Messages for disk image notebooks",
-	"version": "3.0.0",
+	"version": "4.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {

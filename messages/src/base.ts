@@ -51,7 +51,7 @@ export interface Track {
     head: number,
     flux_code: string,
     nibble_code: string,
-    chs_map: [[number,number,number]]
+    chs_map: [[number,number,number,number]]
 }
 
 export interface Geometry {
@@ -66,6 +66,7 @@ export interface DirectoryRow {
 
 export class CreateInteractive {
     img_hash: string;
+    has_nibbles: boolean;
     geometry: Geometry | null;
     stat: Stat | null;
     root_files: DirectoryRow[] | null;

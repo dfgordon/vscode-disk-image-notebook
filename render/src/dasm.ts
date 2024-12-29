@@ -1,14 +1,8 @@
 import type { RendererContext } from 'vscode-notebook-renderer';
 import { useRef } from 'preact/hooks'
 import { html } from 'htm/preact';
-import * as theme from '../../messages/src/themes.js';
+import { ThemeButtonProps, stdHeight } from './component.js';
 import { ObjectCode, OpenDasm } from '../../messages/src/base.js';
-
-export type ThemeButtonProps = {
-    name: string,
-    color_theme: theme.ThemeColors,
-    callback: (event: Event) => void
-};
 
 export function PostOpenDasm(ctx: RendererContext<any>, objectCode: ObjectCode, proc: string, img_hash: string) {
     if (proc == "6502") {
@@ -28,12 +22,12 @@ export function PostOpenDasm(ctx: RendererContext<any>, objectCode: ObjectCode, 
 
 export function DasmMenu(props: ThemeButtonProps) {
     function highlight(style: CSSStyleDeclaration) {
-        style.backgroundColor = props.color_theme.radioOnBackground;
-        style.color = props.color_theme.radioOnForeground;
+        style.backgroundColor = props.theme.radioOnBackground;
+        style.color = props.theme.radioOnForeground;
     }
     function unhighlight(style: CSSStyleDeclaration) {
-        style.backgroundColor = props.color_theme.radioOffBackground;
-        style.color = props.color_theme.radioOffForeground;
+        style.backgroundColor = props.theme.radioOffBackground;
+        style.color = props.theme.radioOffForeground;
     }
     // some better way?
     const menu0 = useRef(null);
@@ -68,24 +62,26 @@ export function DasmMenu(props: ThemeButtonProps) {
         overflow: 'auto',
         'z-index': 1,
         'text-decoration': 'none',
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.buttonBackground,
-        color: props.color_theme.buttonForeground
+        border: props.theme.buttonBorder,
+        'background-color': props.theme.buttonBackground,
+        color: props.theme.buttonForeground
     };
     const css_btn = {
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.buttonBackground,
-        color: props.color_theme.buttonForeground,
+        border: props.theme.buttonBorder,
+        'background-color': props.theme.buttonBackground,
+        color: props.theme.buttonForeground,
         'text-decoration': 'none',
         padding: '2px 8px',
+        height: stdHeight,
         cursor: 'pointer'
     };
     const css_item = {
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.radioDisabledBackground,
-        color: props.color_theme.radioOffForeground,
+        border: props.theme.buttonBorder,
+        'background-color': props.theme.radioDisabledBackground,
+        color: props.theme.radioOffForeground,
         'text-decoration': 'none',
         padding: '2px 8px',
+        height: stdHeight,
         cursor: 'pointer',
         overflow: 'auto',
         display: 'block',
@@ -93,7 +89,7 @@ export function DasmMenu(props: ThemeButtonProps) {
     };
     return html`
     <div style=${css_dropdown} onMouseEnter=${showMenu} onMouseLeave=${hideMenu}>
-        <a href="#" style=${css_btn}>${props.name}</a>
+        <button style=${css_btn}>${props.name}</a>
         <div ref=${dropdown} style=${css_content}>
             <div><a href="#" ref=${menu0} style=${css_item} onMouseEnter=${highlight0} onMouseLeave=${unhighlight0} onClick=${props.callback}>6502</a></div>
             <div><a href="#" ref=${menu1} style=${css_item} onMouseEnter=${highlight1} onMouseLeave=${unhighlight1} onClick=${props.callback}>65c02</a></div>

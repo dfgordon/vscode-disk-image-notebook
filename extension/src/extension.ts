@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as util from './util.js';
 import * as nib from './nibbles.js';
 import * as mess_base from '../../messages/src/base.js';
-import { bin2txt } from './a2kit.js';
+import { bin2txt, bin2bin } from './a2kit.js';
 import { handle_request, create_interactive } from './interactive.js';
 import { parse_line } from './codecell.js';
 
@@ -70,7 +70,7 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 		} else {
 			try {
 				serverVersionString = bin2txt(['-V'], undefined);
-				console.log("backend version: " + serverVersionString);
+				console.log("mounting image with backend version: " + serverVersionString);
 				const matches = serverVersionString.match(/a2kit ([0-9]+)\.([0-9]+)\.([0-9]+)/);
 				if (!matches || matches?.length != 4) {
 					vscode.window.showErrorMessage("error getting a2kit version");
@@ -261,6 +261,14 @@ export class DiskImageController {
 			return geo;				
 		}
 		throw Error;
+	}
+	testNibbles(img_hash: string, img_buf: Buffer): boolean {
+		try {
+			const res = bin2bin(["get", "-t", "track", "-f", "0,0"], img_buf);
+			return true;
+		} catch (err) {
+			return false;
+		}
 	}
 	findTrack(geo: mess_base.Geometry,cyl: number, head: number) : mess_base.Track | null {
 		for (const trk of geo.tracks) {

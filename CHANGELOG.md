@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### New Features
+
+* Better track, sector, and block views
+* More robust against simple copy protections
+* Some performance problems have been solved
+
+### Breaking Changes
+
+* More internal refactoring
+* Track mnemonics are further tweaked
+
 ## [3.0.0] - 2024-12-15
 
 ### New Features

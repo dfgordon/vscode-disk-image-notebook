@@ -1,12 +1,13 @@
 import type { RendererContext } from 'vscode-notebook-renderer';
-import { useState, useRef } from 'preact/hooks'
+import { useSignal, batch } from '@preact/signals'
 import { VNode } from 'preact';
 import { html } from 'htm/preact';
 import * as decode from './decode.js';
 import * as mess_base from '../../messages/src/base.js';
 import * as mess_xp from '../../messages/src/explore.js';
 import * as mess_theme from '../../messages/src/themes.js';
-import { ThemeButtonProps, DasmMenu, PostOpenDasm } from './dasm.js';
+import { ThemeButtonProps, ThemeButton } from './component.js';
+import { DasmMenu, PostOpenDasm } from './dasm.js';
 
 export type ExploreProps = {
     img_hash: string,
@@ -16,7 +17,7 @@ export type ExploreProps = {
     start_path: string,
     start_files: mess_base.DirectoryRow[],
     stat: mess_base.Stat,
-    color_theme: mess_theme.ThemeColors
+    theme: mess_theme.ThemeColors
 };
 
 type UserSelectProps = {
@@ -94,140 +95,132 @@ function user_selection(props: UserSelectProps) {
     </select>`
 }
 
-function themeButton(props: ThemeButtonProps) {
-    const css_btn = {
-        border: props.color_theme.buttonBorder,
-        'background-color': props.color_theme.buttonBackground,
-        color: props.color_theme.buttonForeground,
-        'text-decoration': 'none',
-        padding: '2px 8px',
-        cursor: 'pointer'
-    };
-    return html`<a href="#" style=${css_btn} onClick=${props.callback}>${props.name}</a>`
-}
-
 function textButton(props: ThemeButtonProps) {
     const css_btn = {
         border: 'none',
         background: 'none',
-        color: props.color_theme.link,
+        color: props.theme.link,
         cursor: 'pointer'
     };
     return html`<button style=${css_btn} onClick=${props.callback}>${props.name}</button>`;
 }
 
 export function Explore(props: ExploreProps) {
-    const [dir, setDir] = useState(true);
-    const [rows, setRows] = useState(props.start_files);
-    const [content, setContent] = useState("");
-    const [objectCode, setObjectCode] = useState(null);
-    const [typ, setTyp] = useState("");
-    const [path, setPath] = useState(props.start_path);
-    const [user, setUser] = useState(props.stat.users.length > 0 ? props.stat.users[0] : "0");
+    const path = useSignal(props.start_path);
+    const isDir = useSignal(true);
+    const typ = useSignal("");
+    const user = useSignal(props.stat.users.length > 0 ? props.stat.users[0] : "0");
+    const rows = useSignal(props.start_files);
+    const content = useSignal("");
+    const objectCode = useSignal(null);
     props.ctx.onDidReceiveMessage(messg => {
         if (mess_xp.ReturnedSubdirectory.test(messg) && messg.img_hash == props.img_hash) {
             const tm: mess_xp.ReturnedSubdirectory = messg;
-            setPath(tm.new_path);
-            setRows(tm.rows);
-            setDir(true);
+            batch(() => {
+                path.value = tm.new_path;
+                rows.value = tm.rows;
+                isDir.value = true;
+            });
         } else if (mess_xp.ReturnedFile.test(messg) && messg.img_hash == props.img_hash) {
             const tm: mess_xp.ReturnedFile = messg;
-            setPath(tm.new_path);
-            setContent(tm.content);
-            setObjectCode(tm.objectCode);
-            setTyp(tm.typ);
-            setDir(false);
+            batch(() => {
+                path.value = tm.new_path;
+                content.value = tm.content;
+                objectCode.value = tm.objectCode;
+                typ.value = tm.typ;
+                isDir.value = false;
+            });
         }
     });
     const onSel = (event: Event) => {
         if (event.target instanceof HTMLElement) {
             const newFile = event.target.textContent;
-            if (props.stat.fs_name == "cpm" && path=="/") {
-                setUser(newFile);
+            if (props.stat.fs_name == "cpm" && path.value=="/") {
+                user.value = newFile;
             }
-            props.ctx.postMessage(new mess_xp.ChangeDirectory(path, newFile, props.img_hash));
+            props.ctx.postMessage(new mess_xp.ChangeDirectory(path.value, newFile, props.img_hash));
         }
     }
     const onBack = (event: Event) => {
         if (event.target instanceof HTMLElement) {
-            const match = path.match(/^\/([0-9]+)\/.+$/);
+            const match = path.value.match(/^\/([0-9]+)\/.+$/);
             if (props.stat.fs_name == "cpm" && match) {
-                setUser(match[1]);
+                user.value = match[1];
             }
-            props.ctx.postMessage(new mess_xp.ChangeDirectory(path, "..", props.img_hash));
+            props.ctx.postMessage(new mess_xp.ChangeDirectory(path.value, "..", props.img_hash));
         }
     }
     const onOpen = (event: Event) => {
         if (event.target instanceof HTMLElement) {
-            props.ctx.postMessage(new mess_xp.OpenFile(content, props.stat.fs_name, typ, props.img_hash));
+            props.ctx.postMessage(new mess_xp.OpenFile(content.value, props.stat.fs_name, typ.value, props.img_hash));
         }
     }
     const onDasm = (event: Event) => {
         if (event.target instanceof HTMLElement && objectCode) {
-            PostOpenDasm(props.ctx, objectCode, event.target.textContent, props.img_hash);
+            PostOpenDasm(props.ctx, objectCode.value, event.target.textContent, props.img_hash);
         }
     }
     const onUser = (event: Event) => {
         if (event.target instanceof HTMLSelectElement) {
-            setUser(event.target.value);
+            user.value = event.target.value;
             props.ctx.postMessage(new mess_xp.ChangeDirectory("/", event.target.value, props.img_hash));
         }
     }
 
-    if (!dir && objectCode && (props.stat.fs_name == "prodos" || props.stat.fs_name == "a2 dos")) {
+    if (!isDir.value && objectCode.value && (props.stat.fs_name == "prodos" || props.stat.fs_name == "a2 dos")) {
         return html`
         <div style=${{ 'padding-top': '10px', clear: 'left' }}>
-        ${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}
+        ${ThemeButton({ name: "<", theme: props.theme, callback: onBack })}
         <span style=${{ 'padding-left': '10px', 'padding-right': '10px' }}>
-            ${file_header(props.stat.fs_name, path)}
+            ${file_header(props.stat.fs_name, path.value)}
         </span>
         <span style=${{ 'padding-right': '10px' }}>
-            ${themeButton({ name: "\u{1f4c2}", color_theme: props.color_theme, callback: onOpen })}
+            ${ThemeButton({ name: "\u{1f4c2}", theme: props.theme, callback: onOpen })}
         </span>
-        ${DasmMenu({ name: "DASM", color_theme: props.color_theme, callback: onDasm })}
+        ${DasmMenu({ name: "DASM", theme: props.theme, callback: onDasm })}
         </div>
         <div>
         <pre>
-        ${content}
+        ${content.value}
         </pre>
         </div>
         `;
-    }  else if (!dir) {
+    }  else if (!isDir.value) {
         return html`
         <div style=${{ 'padding-top': '10px', clear: 'left' }}>
-        ${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}
-        <span style=${{ 'padding-left': '10px', 'padding-right': '10px' }}>${file_header(props.stat.fs_name, path)}</span>
-        ${themeButton({ name: "\u{1f4c2}", color_theme: props.color_theme, callback: onOpen })}
+        ${ThemeButton({ name: "<", theme: props.theme, callback: onBack })}
+        <span style=${{ 'padding-left': '10px', 'padding-right': '10px' }}>${file_header(props.stat.fs_name, path.value)}</span>
+        ${ThemeButton({ name: "\u{1f4c2}", theme: props.theme, callback: onOpen })}
         </div>
         <div>
         <pre>
-        ${content}
+        ${content.value}
         </pre>
         </div>
         `;
     } else {
-        const root = path == props.root_path;
+        const root = path.value == props.root_path;
         const selectionProps: UserSelectProps = {
             users: props.stat.users,
-            starting_user: user,
+            starting_user: user.value,
             callback: onUser
 
         }
         return html`
         <div style=${{ 'padding-top': '10px', clear: 'left' }}>
-            ${root ? html`` : html`${themeButton({ name: "<", color_theme: props.color_theme, callback: onBack })}`}
-            <span style=${root ? {} : { 'padding-left': '10px' }}>${dir_header(props.stat.fs_name, path, props.stat.label,selectionProps)}</span>
+            ${root ? html`` : html`${ThemeButton({ name: "<", theme: props.theme, callback: onBack })}`}
+            <span style=${root ? {} : { 'padding-left': '10px' }}>${dir_header(props.stat.fs_name, path.value, props.stat.label,selectionProps)}</span>
         </div>
         <div>
-            ${rows.length > 0 ? html`
+            ${rows.value.length > 0 ? html`
             <table>
             <tr>
                 <th style=${{'text-align':'left'}}>${props.stat.fs_name=='cpm' && root ? 'Users' : 'File/Dir'}</th>
-                ${Object.keys(rows[0].meta).map(item => { return html`<th>${item.replace('_',' ')}</th>` })}
+                ${Object.keys(rows.value[0].meta).map(item => { return html`<th>${item.replace('_',' ')}</th>` })}
             </tr>
-            ${rows.map(row => {
+            ${rows.value.map(row => {
                 return html`<tr>
-                    <td style=${{ 'text-align': 'left' }}>${textButton({ name: row.name, color_theme: props.color_theme, callback: onSel })}</td>
+                    <td style=${{ 'text-align': 'left' }}>${textButton({ name: row.name, theme: props.theme, callback: onSel })}</td>
                     ${Object.entries(row.meta).map(([key, item]) => {
                         return key=='type' ? html`<td>${decode.prettyType(item.toString(),props.stat.fs_name)}</td>` : html`<td>${item.toString()}</td>`
                     })}

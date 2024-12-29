@@ -11,10 +11,12 @@ export class LoadNibbles extends MessageBase {
 
 export class LoadSector extends MessageBase {
     static id = "dimg-LoadSector";
-    chs: [number, number, number];
-    constructor(cyl: number, head: number, sec: number, hash: string) {
+    trk: number;
+    angle: number;
+    constructor(trk: number, angle: number, hash: string) {
         super(hash);
-        this.chs = [cyl, head, sec];
+        this.trk = trk;
+        this.angle = angle;
     }
 }
 

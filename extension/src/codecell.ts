@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { bin2bin, bin2txt, FileImage } from './a2kit.js';
+import { Geometry } from '../../messages/src/base.js';
 import * as util from './util.js';
 import * as nib from './nibbles.js';
 import { type DiskImageController } from './extension.js';
@@ -27,12 +28,14 @@ const help_string =
 \nCode Cells - binary: \n\
 * `track <cyl,head>` - hex dump track nibbles (if applicable)\n\
 * `sec <cyl,head,sector>` - hex dump sector\n\
+* `sec <cyl,head,n1,n2,n3,...,nn>` - hex dump sector sequence\n\
 * `block <block>` - hex dump block\n\
 \nNotes:\n\
 * `dir` supports wildcards with CP/M and FAT disks\n\
 * `dir` supports CP/M 3 command tails, e.g., `dir *.com[full]`\n\
 * Always use forward slash separator, never backslash\n\
 * `<file>` can have spaces, do not quote or escape\n\
+* Sequential `sec` request will respect angle-order\n\
 * How to handle file type extensions\n\
 	- Apple: not part of filename\n\
 	- FAT or CP/M: part of filename\n\
@@ -117,7 +120,7 @@ export function parse_line(this: DiskImageController, line: string, img_path: st
             const content = bin2txt([cmd[0], "-f", cmd[1], "--indent", "4"], img_buf);
             out_cells.push(vscode.NotebookCellOutputItem.text(content, "text/x-json"));
         } else if (cmd.length == 3 && cmd[0] == "dasm") {
-            const valid_procs = ["6502","65c02","65816-00","65816-01","65816-10","65816-11"];
+            const valid_procs = ["6502", "65c02", "65816-00", "65816-01", "65816-10", "65816-11"];
             const proc_arg = cmd[1];
             if (valid_procs.includes(proc_arg)) {
                 const path_arg = util.trailingArgWithSpaces(line, 2);
@@ -181,7 +184,17 @@ export function parse_line(this: DiskImageController, line: string, img_path: st
             const res = bin2txt(["geometry"], img_buf);
             out_cells.push(vscode.NotebookCellOutputItem.text(res, "text/x-json"));
         } else if (cmd.length == 2 && cmd[0] == "track") {
-            const geo = this.updateGeometry(notebook.metadata.img_hash, img_buf);
+            let geo: Geometry | null;
+            try {
+                geo = this.updateGeometry(notebook.metadata.img_hash, img_buf);
+            } catch (error) {
+                geo = null;
+            }
+            if (geo == null) {
+                const res = bin2bin(["get", "-t", "track", "-f", cmd[1]], img_buf);
+                out_cells.push(vscode.NotebookCellOutputItem.text(nib.trackDump(res, nib.Std16)));
+                return out_cells;
+            }
             const ch = cmd[1].split(',');
             if (ch.length != 2) {
                 out_cells.push(vscode.NotebookCellOutputItem.text("SYNTAX ERROR: " + line));
@@ -197,9 +210,19 @@ export function parse_line(this: DiskImageController, line: string, img_path: st
                 return out_cells;
             }
             const res = bin2bin(["get", "-t", "track", "-f", cmd[1]], img_buf);
-            out_cells.push(vscode.NotebookCellOutputItem.text(nib.trackDump(res, this.getNibDesc(geo,trk))));
+            out_cells.push(vscode.NotebookCellOutputItem.text(nib.trackDump(res, this.getNibDesc(geo, trk))));
         } else if (cmd.length == 2 && cmd[0] == "sec") {
-            const res = bin2bin(["get", "-t", "sec", "-f", cmd[1]], img_buf);
+            let seq = "";
+            if (cmd[1].split(",").length == 3) {
+                seq = cmd[1];
+            } else {
+                const addr_list = cmd[1].split(",");
+                for (let sec of addr_list.slice(2)) {
+                    seq += addr_list[0] + "," + addr_list[1] + "," + sec + ",,";
+                }
+                seq = seq.slice(0, -2);
+            }
+            const res = bin2bin(["get", "-t", "sec", "-f", seq], img_buf);
             out_cells.push(vscode.NotebookCellOutputItem.text(util.hexDump(res, 0)));
         } else if (cmd.length == 2 && cmd[0] == "block") {
             const res = bin2bin(["get", "-t", "block", "-f", cmd[1]], img_buf);

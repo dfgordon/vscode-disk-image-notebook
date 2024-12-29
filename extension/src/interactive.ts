@@ -42,8 +42,10 @@ export function create_interactive(this: DiskImageController, notebook: vscode.N
     } catch (Error) {
         console.log("could not determine disk geometry");
     }
+    const has_nibbles = this.testNibbles(notebook.metadata.img_has, img_buf);
     if (stat == null && (geometry == null || geometry.tracks == null)) {
-        out_cells.push(vscode.NotebookCellOutputItem.text("Disk could not be solved on any level"));
+        out_cells.push(vscode.NotebookCellOutputItem.text("Disk geometry could not be determined"));
+        out_cells.push(vscode.NotebookCellOutputItem.text("You may still be able to view tracks in a code cell"));
     } else {
         const config = vscode.workspace.getConfiguration("diskimage");
         const theme_str = config.get('interactiveTheme') as string;
@@ -55,6 +57,7 @@ export function create_interactive(this: DiskImageController, notebook: vscode.N
         }
         const create_mess: mess_base.CreateInteractive = {
             img_hash: notebook.metadata.img_hash,
+            has_nibbles,
             geometry,
             stat,
             root_path,
@@ -81,11 +84,27 @@ export function handle_request(this: DiskImageController, event: req_event) {
     }
     if (mess_trk.LoadSector.test(event.message)) {
         const messg: mess_trk.LoadSector = event.message;
-        //console.log("loading sector " + messg.chs);
-        const chs_str = messg.chs[0].toString() + "," + messg.chs[1].toString() + "," + messg.chs[2].toString();
+        const track = this.geometry_map.get(messg.img_hash)?.tracks[messg.trk];
+        if (!track) {
+            this.vs_messager.postMessage(new mess_trk.ReturnedSector("disk geometry missing", null, messg.img_hash));
+            return;
+        }
+        //console.log("loading sector " + messg.rzq);
+        // form address sequence to find this angle
+        let seq = "";
+        let offset = 0;
+        for (let q = 0; q <= messg.angle; q++) {
+            seq += track.cylinder.toString() + "," + track.head.toString() + "," + track.chs_map[q][2].toString();
+            if (q < messg.angle) {
+                seq += ",,";
+                // chs_map[q][3] includes tag bytes, but sector data will not, so we apply a mask that
+                // handles all cases we can think of
+                offset += track.chs_map[q][3] & 0b1111111111000000;
+            }
+        }
         try {
-            const res = bin2bin(["get", "-t", "sec", "-f", chs_str], img_buf);
-            const hex = util.hexDump(res, 0);
+            const res = bin2bin(["get", "-t", "sec", "-f", seq], img_buf);
+            const hex = util.hexDump(res.subarray(offset), 0);
             const obj = new mess_base.ObjectCode(0x800, util.parseHexDump(hex));
             this.vs_messager.postMessage(new mess_trk.ReturnedSector(hex, obj, messg.img_hash));
         } catch (error) {

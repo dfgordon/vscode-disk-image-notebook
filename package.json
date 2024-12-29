@@ -3,7 +3,7 @@
 	"displayName": "Disk Image Notebook",
 	"description": "Look inside disk images",
 	"icon": "disk-image-icon.png",
-	"version": "3.0.0",
+	"version": "4.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -68,14 +68,17 @@
 	"scripts": {
 		"reset-render": "run-script-os",
 		"reset-extension": "run-script-os",
+		"reset-messages": "run-script-os",
 		"reset-render:windows": "npx rimraf render\\out && mkdir render\\out",
 		"reset-render:default": "npx rimraf render/out && mkdir render/out",
 		"reset-extension:windows": "npx rimraf extension\\out && mkdir extension\\out",
 		"reset-extension:default": "npx rimraf extension/out && mkdir extension/out",
-		"vscode:prepublish": "npm run esbuild-render -- --minify && npm run esbuild-extension -- --minify",
+		"reset-messages:windows": "npx rimraf messages\\out",
+		"reset-messages:default": "npx rimraf messages/out",
+		"vscode:prepublish": "npm run reset-messages && npm run esbuild-render -- --minify && npm run esbuild-extension -- --minify",
 		"esbuild-render": "npm run reset-render && esbuild ./render/src/index.ts --bundle --outfile=render/out/index.js --format=esm --platform=node",
 		"esbuild-extension": "npm run reset-extension && esbuild ./extension/src/extension.ts --bundle --outfile=extension/out/extension.js --external:vscode --format=cjs --platform=node",
-		"build": "npm run esbuild-render -- --sourcemap && npm run esbuild-extension -- --sourcemap",
+		"build": "npm run reset-messages && npm run esbuild-render -- --sourcemap && npm run esbuild-extension -- --sourcemap",
 		"lint": "eslint . --ext .ts,.tsx",
 		"test-compile": "npm run reset-extension && tsc -b ./extension/src",
 		"test": "node ./extension/out/test/runTest.js"

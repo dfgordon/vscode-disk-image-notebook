@@ -21,7 +21,7 @@ export type ThemeColors = {
 export const TrueNeutral: ThemeColors = {
     link: '#8080a0',
 
-    buttonBorder: 'none',
+    buttonBorder: '1px solid black',
     buttonBackground: '#404040',
     buttonForeground: '#c0c0c0',
 
@@ -41,7 +41,7 @@ export const TrueNeutral: ThemeColors = {
 export const AmberDays: ThemeColors = {
     link: '#d08000',
 
-    buttonBorder: 'none',
+    buttonBorder: '1px solid black',
     buttonBackground: '#383018',
     buttonForeground: '#d08000',
 

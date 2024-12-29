@@ -130,6 +130,7 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
     let slice_start = 0;
     let addr_count = 0;
     let err_count = 0;
+    let in_addr_field = false;
     const [apro, aepi, dpro, depi] = [nibs.addrProlog, nibs.addrEpilog, nibs.dataProlog, nibs.dataEpilog];
     let nib_table: number[] | undefined;
     if (nibs.dataNib == NibbleOptions.N53) {
@@ -184,7 +185,10 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
                 else if (trk[i] == 0xff && fwd == 0xff) mnemonics += ">";
                 // address prolog
                 else if (trk[i] == apro[0] && fwd == apro[1]) mnemonics += "(";
-                else if (bak == apro[0] && trk[i] == apro[1] && fwd == apro[2]) mnemonics += "A";
+                else if (bak == apro[0] && trk[i] == apro[1] && fwd == apro[2]) {
+                    in_addr_field = true;
+                    mnemonics += "A";
+                }
                 else if (bak == apro[1] && trk[i] == apro[2]) {
                     mnemonics += ":";
                     addr_count = 1;
@@ -195,12 +199,18 @@ export function trackDump(trk: Uint8Array, nibs: NibbleDesc): string {
                 else if (bak == dpro[1] && trk[i] == dpro[2]) mnemonics += ":";
                 // address epilog
                 else if (trk[i] == aepi[0] && fwd == aepi[1]) mnemonics += ":";
-                else if (bak == aepi[0] && trk[i] == aepi[1]) mnemonics += ":";
-                else if (bak == aepi[1]) mnemonics += ")";
+                else if (bak == aepi[0] && trk[i] == aepi[1]) mnemonics += in_addr_field ? "A" : "D";
+                else if (bak == aepi[1]) {
+                    in_addr_field = false;
+                    mnemonics += ")";
+                }
                 // data epilog
                 else if (trk[i] == depi[0] && fwd == depi[1]) mnemonics += ":";
-                else if (bak == depi[0] && trk[i] == depi[1]) mnemonics += ":";
-                else if (bak == depi[1]) mnemonics += ")";
+                else if (bak == depi[0] && trk[i] == depi[1]) mnemonics += in_addr_field ? "A" : "D";
+                else if (bak == depi[1]) {
+                    in_addr_field = false;
+                    mnemonics += ")";
+                }
                 else if (trk[i] == 0xd5) mnemonics += "R";
                 else if (trk[i] == 0xaa) mnemonics += "R";
                 else mnemonics += ".";

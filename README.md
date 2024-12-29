@@ -15,3 +15,7 @@ The backend is bundled for Windows x86_64, Linux x86_64, Mac x86_64, and Mac aar
 1. Install a C compiler if necessary
 2. Install rust if necessary, often a package manager suffices, e.g. `brew install rust`, otherwise search for `rustup`
 3. Enter `cargo install a2kit` in your terminal
+
+## Note on ANIMALS
+
+The demo shows the source code for `ANIMALS`.  There is sometimes no space after the `REM` token.  This is not a mistake.  The backend's detokenizers are designed to be inversions of the vendor's tokenizers.  In some cases the vendor's detokenizer is *not* an inversion, in which case the backend's detokenizer will format things differently.
