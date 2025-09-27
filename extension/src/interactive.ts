@@ -6,7 +6,6 @@ import * as mess_xp from '../../messages/src/explore.js';
 import * as mess_base from '../../messages/src/base.js';
 import { bin2bin, bin2txt, FileImage } from './a2kit.js';
 import * as util from './util.js';
-import * as nib from './nibbles.js';
 import { type DiskImageController } from './extension.js';
 
 interface req_event
@@ -15,7 +14,7 @@ interface req_event
     readonly message: any;
 };
 
-export function create_interactive(this: DiskImageController, notebook: vscode.NotebookDocument, img_buf: Buffer): Array<vscode.NotebookCellOutputItem> {
+export function create_interactive(this: DiskImageController, notebook: vscode.NotebookDocument, img_buf: Uint8Array): Array<vscode.NotebookCellOutputItem> {
     const out_cells = new Array<vscode.NotebookCellOutputItem>();
     let tree: util.Tree | null = null;
     let geometry: mess_base.Geometry | null = null;
@@ -42,11 +41,11 @@ export function create_interactive(this: DiskImageController, notebook: vscode.N
     } catch (Error) {
         console.log("could not determine disk geometry");
     }
-    const has_nibbles = this.testNibbles(notebook.metadata.img_has, img_buf);
-    if (stat == null && (geometry == null || geometry.tracks == null)) {
+    if (geometry == null || geometry.tracks == null) {
         out_cells.push(vscode.NotebookCellOutputItem.text("Disk geometry could not be determined"));
         out_cells.push(vscode.NotebookCellOutputItem.text("You may still be able to view tracks in a code cell"));
     } else {
+        const has_nibbles = this.testNibbles(geometry, notebook.metadata.img_hash, img_buf);
         const config = vscode.workspace.getConfiguration("diskimage");
         const theme_str = config.get('interactiveTheme') as string;
         let color_theme = theme.AmberDays;
@@ -77,6 +76,8 @@ export function handle_request(this: DiskImageController, event: req_event) {
         return;
     }
     const img_buf = this.data_map.get(event.message.img_hash);
+    const maybe_method = this.method_map.get(event.message.img_hash);
+    const maybe_fmt = this.fmt_map.get(event.message.img_hash);
     if (!img_buf) {
         vscode.window.showErrorMessage("no buffer, if it was deleted to save resources, re-running the code cell might restore it")
         console.log("message not handled by controller (no buffer)")
@@ -86,26 +87,58 @@ export function handle_request(this: DiskImageController, event: req_event) {
         const messg: mess_trk.LoadSector = event.message;
         const track = this.geometry_map.get(messg.img_hash)?.tracks[messg.trk];
         if (!track) {
-            this.vs_messager.postMessage(new mess_trk.ReturnedSector("disk geometry missing", null, messg.img_hash));
+            this.vs_messager.postMessage(new mess_trk.ReturnedSector("track is missing", null, messg.img_hash));
+            return;
+        }
+        if (typeof track.solution === 'string') {
+            this.vs_messager.postMessage(new mess_trk.ReturnedSector("track is " + track.solution, null, messg.img_hash));
             return;
         }
         //console.log("loading sector " + messg.rzq);
         // form address sequence to find this angle
         let seq = "";
+        let explicit = "";
         let offset = 0;
-        for (let q = 0; q <= messg.angle; q++) {
-            seq += track.cylinder.toString() + "," + track.head.toString() + "," + track.chs_map[q][2].toString();
-            if (q < messg.angle) {
-                seq += ",,";
-                // chs_map[q][3] includes tag bytes, but sector data will not, so we apply a mask that
-                // handles all cases we can think of
-                offset += track.chs_map[q][3] & 0b1111111111000000;
+        let sol = track.solution;
+        if (sol.addr_type == "VTSK") {
+            for (let q = 0; q <= messg.angle; q++) {
+                const addr = util.parseAddr(sol.addr_map[q]);
+                seq += track.cylinder.toString() + "," + track.head.toString() + "," + q.toString();
+                explicit += sol.addr_map[q];
+                if (q < messg.angle) {
+                    seq += ",,";
+                    explicit += ",";
+                    offset += sol.size_map[q];
+                }
+            }
+        } else if (sol.addr_type == "CHSFKK") {
+            for (let q = 0; q <= messg.angle; q++) {
+                const addr = util.parseAddr(sol.addr_map[q]);
+                seq += track.cylinder.toString() + "," + track.head.toString() + "," + addr[2].toString();
+                if (q < messg.angle) {
+                    seq += ",,";
+                    offset += sol.size_map[q];
+                }
+            }
+        } else if (sol.addr_type == "CSHFK") {
+            for (let q = 0; q <= messg.angle; q++) {
+                const addr = util.parseAddr(sol.addr_map[q]);
+                seq += track.cylinder.toString() + "," + track.head.toString() + "," + addr[1].toString();
+                if (q < messg.angle) {
+                    seq += ",,";
+                    offset += sol.size_map[q];
+                }
             }
         }
+        let args = ["get", "-t", "sec", "-f", seq]
+        if (explicit != "") {
+            args.push("--explicit")
+            args.push(explicit);
+        }
         try {
-            const res = bin2bin(["get", "-t", "sec", "-f", seq], img_buf);
-            const hex = util.hexDump(res.subarray(offset), 0);
-            const obj = new mess_base.ObjectCode(0x800, util.parseHexDump(hex));
+            const res = bin2bin(args, img_buf, maybe_method, maybe_fmt).slice(offset);
+            const hex = util.hexDump(res, 0);
+            const obj = new mess_base.ObjectCode(0x800, res);
             this.vs_messager.postMessage(new mess_trk.ReturnedSector(hex, obj, messg.img_hash));
         } catch (error) {
             if (error instanceof Error)
@@ -115,9 +148,9 @@ export function handle_request(this: DiskImageController, event: req_event) {
         const messg: mess_trk.LoadBlock = event.message;
         //console.log("loading block " + messg.block);
         try {
-            const res = bin2bin(["get", "-t", "block", "-f", messg.block.toString()], img_buf);
-            const hex = util.hexDump(res, 0);
-            const obj = new mess_base.ObjectCode(0x800, util.parseHexDump(hex));
+            const res = bin2bin(["get", "-t", "block", "-f", messg.block.toString()], img_buf, maybe_method, maybe_fmt);
+            const hex = bin2txt(["get", "-t", "block", "-f", messg.block.toString(), "--console"], img_buf, maybe_method, maybe_fmt);
+            const obj = new mess_base.ObjectCode(0x800, res);
             this.vs_messager.postMessage(new mess_trk.ReturnedBlock(hex, obj, messg.img_hash));
         } catch (error) {
             if (error instanceof Error)
@@ -128,10 +161,8 @@ export function handle_request(this: DiskImageController, event: req_event) {
         //console.log("loading nibbles " + messg.ch);
         const ch_str = messg.ch[0].toString() + "," + messg.ch[1].toString();
         try {
-            const res = bin2bin(["get", "-t", "track", "-f", ch_str], img_buf);
-            const nib_desc = nib.GetNibbleDesc(img_buf);
-            if (nib_desc)
-                this.vs_messager.postMessage(new mess_trk.ReturnedNibbles(nib.trackDump(res, nib_desc), messg.img_hash));
+            const res = bin2txt(["get", "--console", "-t", "track", "-f", ch_str], img_buf, maybe_method, maybe_fmt);
+            this.vs_messager.postMessage(new mess_trk.ReturnedNibbles(res, messg.img_hash));
         } catch (error) {
             if (error instanceof Error)
                 this.vs_messager.postMessage(new mess_trk.ReturnedNibbles(error.message, messg.img_hash));
@@ -146,9 +177,9 @@ export function handle_request(this: DiskImageController, event: req_event) {
         }
         else {
             const cpm_corrected = tree.file_system == "cpm" ? util.cpmForm(new_path_actual) : new_path_actual;
-            const res = bin2txt(["get", "-f", cpm_corrected, "-t", "any"], img_buf);
+            const res = bin2txt(["get", "-f", cpm_corrected, "-t", "any"], img_buf, maybe_method, maybe_fmt);
             const fimg = new FileImage(res);
-            const [objCode, content] = fimg.getText(cpm_corrected, img_buf);
+            const [objCode, content] = fimg.getText(cpm_corrected, img_buf, maybe_method, maybe_fmt);
             this.vs_messager.postMessage(new mess_xp.ReturnedFile(new_path_actual, content, objCode, fimg.img.fs_type, messg.img_hash));
         }
     } else if (mess_xp.OpenFile.test(event.message)) {
@@ -187,13 +218,17 @@ export function handle_request(this: DiskImageController, event: req_event) {
             load_addr = 8192; // probably a system file
         }
         try {
-            const buf = Buffer.from(mess.objectCode.code);
-            const res = bin2txt(["dasm", "-p", proc, "--mx", mess.mx, "--org", load_addr.toString()], buf);
+            const buf = Buffer.from(mess.objectCode.code, "hex");
+            const res = bin2txt(["dasm", "-p", proc, "--mx", mess.mx, "--org", load_addr.toString()], Uint8Array.from(buf), undefined, undefined);
             vscode.workspace.openTextDocument({ content: res, language: "merlin6502" }).then(doc => {
                 vscode.window.showTextDocument(doc);
             });
         } catch (err) {
             console.log(err);
         }
+    } else if (mess_base.ChangeMethod.test(event.message)) {
+        const mess: mess_base.ChangeMethod = event.message;
+        this.method_map.set(mess.img_hash, mess.content);
+        this.vs_messager.postMessage(new mess_base.MethodChanged(mess.content, mess.img_hash));
     }
 }

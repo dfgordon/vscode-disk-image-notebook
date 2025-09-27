@@ -9,12 +9,13 @@ export interface Tree {
     }
 }
 
-export function parseCHS(chs: string): [number, number, number] {
-    const ary = chs.split(',').map((s) => parseInt(s));
-    if (ary.length == 3) {
-        return [ary[0], ary[1], ary[2]];
+export function parseAddr(addr: string): number[] {
+    const ans: number[] = [];
+    const l = addr.length / 2;
+    for (var i = 0; i < l; i++) {
+        ans.push(parseInt(addr.substring(2 * i, 2 * i + 2), 16));
     }
-    throw new Error("unexpected error parsing CHS");
+    return ans;
 }
 
 export function rootPath(tree: Tree): string {
@@ -141,44 +142,27 @@ export function verifyPath(path: string, tree: Tree, fs: string, req_re: RegExp 
     return true;
 }
 
-export function hexDump(dat: Buffer,baseAddr: number) : string {
-    const pos_str = Buffer.from(Uint8Array.from(dat).map((val) => {
+export function hexDump(dat: Uint8Array,baseAddr: number) : string {
+    const pos_str = Buffer.from(dat.map((val) => {
         return val >= 32 && val < 127 ? val : 46;
     })).toString();
-    const neg_str = Buffer.from(Uint8Array.from(dat).map((val) => {
+    const neg_str = Buffer.from(dat.map((val) => {
         return val >= 160 && val < 255 ? val - 128 : 46;
     })).toString();
     let content = "";
     const cols = 16;
     for (let i = 0; i < dat.length; i++) {
         if (i % cols == 0 && i > 0) {
-            content += '   ' + pos_str.substring(i - cols, i);
-            content += '    ' + neg_str.substring(i - cols, i) + '\n';
+            content += '|+| ' + pos_str.substring(i - cols, i);
+            content += ' |-| ' + neg_str.substring(i - cols, i) + '\n';
         }
         if (i % cols == 0)
-            content += (baseAddr + i).toString(16).padStart(4, '0').toUpperCase() + ': ';
+            content += (baseAddr + i).toString(16).padStart(4, '0').toUpperCase() + ' : ';
         content += dat[i].toString(16).padStart(2, '0').toUpperCase() + ' ';
         if (i == dat.length - 1) {
-            content += ' '.repeat(3 + 3 * (cols - 1 - i % cols)) + pos_str.substring(i - i % cols, i + 1);
-            content += ' '.repeat(4 + cols - 1 - i % cols) + neg_str.substring(i - i % cols, i + 1) + '\n';
+            content += ' '.repeat(3 * (cols - 1 - i % cols)) + '|+| ' + pos_str.substring(i - i % cols, i + 1);
+            content += ' '.repeat(cols - 1 - i % cols) + ' |-| ' + neg_str.substring(i - i % cols, i + 1) + '\n';
         }
     }
     return content;
-}
-
-/**
- * Parse a hex dump.  Expected row format is `XXXX: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX`.
- * Trailing characters at the end of each row are OK, but otherwise format needs to be exact.
- * @param hexstr hex dump string
- * @returns array of numbers
- */
-export function parseHexDump(hexstr: string): Buffer {
-    const ans: number[] = [];
-    for (const line of hexstr.split(/\r?\n/)) {
-        const cols = line.substring(0, 53).split(/ +/);
-        for (let i = 1; i < cols.length; i++) {
-            ans.push(parseInt(cols[i],16))
-        }
-    }
-    return Buffer.from(Uint8Array.from(ans));
 }

@@ -1,7 +1,7 @@
 {
 	"name": "disk-image-interactive",
 	"description": "notebook renderer for disk images",
-	"version": "4.0.0",
+	"version": "5.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
@@ -9,22 +9,22 @@
 		"url": "https://github.com/dfgordon/"
 	},
 	"engines": {
-		"vscode": "^1.85.0"
+		"vscode": "^1.99.0"
 	},
 	"type": "commonjs",
 	"devDependencies": {
-		"@types/node": "20.x",
-		"@types/vscode": "^1.85.0",
+		"@types/node": "24.x",
+		"@types/vscode": "^1.99.0",
 		"@types/vscode-notebook-renderer": "^1.72.3",
-		"@typescript-eslint/eslint-plugin": "^8.2.0",
-		"@typescript-eslint/parser": "^8.2.0",
-		"@vscode/test-electron": "^2.4.1",
+		"@typescript-eslint/eslint-plugin": "^8.4.1",
+		"@typescript-eslint/parser": "^8.41.0",
+		"@vscode/test-electron": "^2.5.2",
 		"buffer": "^6.0.3",
-		"eslint": "^9.9.1",
+		"eslint": "^9.34.0",
 		"glob": "^11.0.0",
 		"htm": "3.1.1",
-		"@preact/signals": "^2.0.0",
-		"preact": "^10.25.1",
-		"typescript": "^5.5.4"
+		"@preact/signals": "^2.3.1",
+		"preact": "^10.27.1",
+		"typescript": "^5.9.2"
 	}
 }

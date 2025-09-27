@@ -15,10 +15,10 @@ export class MessageBase {
 
 export class ObjectCode {
     load_addr: number;
-    code: Uint8Array;
+    code: string;
     constructor(load_addr: number, code: Uint8Array) {
         this.load_addr = load_addr;
-        this.code = code;
+        this.code = Buffer.from(code).toString("hex");
     }
 }
 
@@ -46,16 +46,39 @@ export interface Stat {
     raw: any
 }
 
+interface Solution {
+    flux_code: string,
+    addr_code: string,
+    nibble_code: string,
+    speed_kbps: number,
+    density: number | null,
+    addr_map: [string],
+    size_map: [number],
+    addr_type: string,
+    addr_mask: [number]
+}
+
+interface Summary {
+    cylinders: number,
+    heads: number,
+    blank_tracks: number,
+    solved_tracks: number,
+    unsolved_tracks: number,
+    last_blank_track: number | null,
+    last_solved_track: number | null,
+    last_unsolved_track: number | null,
+    steps_per_cyl: number
+}
+
 export interface Track {
     cylinder: number,
     head: number,
-    flux_code: string,
-    nibble_code: string,
-    chs_map: [[number,number,number,number]]
+    solution: Solution | string,
 }
 
 export interface Geometry {
     package: string,
+    summary: Summary,
     tracks: Track[]
 }
 
@@ -78,4 +101,22 @@ export class CreateInteractive {
 
 export class ReferencesWereDeleted extends MessageBase {
     static id = "dimg-referencesWereDeleted";
+}
+
+export class ChangeMethod extends MessageBase {
+    static id = "dimg-changeMethod";
+    content: string;
+    constructor(content: string, hash: string) {
+        super(hash);
+        this.content = content;
+    }
+}
+
+export class MethodChanged extends MessageBase {
+    static id = "dimg-methodChanged";
+    content: string;
+    constructor(content: string, hash: string) {
+        super(hash);
+        this.content = content;
+    }
 }

@@ -4,7 +4,6 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as util from './util.js';
-import * as nib from './nibbles.js';
 import * as mess_base from '../../messages/src/base.js';
 import { bin2txt, bin2bin } from './a2kit.js';
 import { handle_request, create_interactive } from './interactive.js';
@@ -69,7 +68,7 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 			out.items.push(vscode.NotebookCellOutputItem.text("ERROR: no backend"));
 		} else {
 			try {
-				serverVersionString = bin2txt(['-V'], undefined);
+				serverVersionString = bin2txt(['-V'], undefined, undefined, undefined);
 				console.log("mounting image with backend version: " + serverVersionString);
 				const matches = serverVersionString.match(/a2kit ([0-9]+)\.([0-9]+)\.([0-9]+)/);
 				if (!matches || matches?.length != 4) {
@@ -77,13 +76,13 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 				}
 				if (matches?.length == 4) {
 					const v = [parseInt(matches[1]), parseInt(matches[2]), parseInt(matches[3])];
-					if (v >= [4, 0, 0]) {
-						const mess = "a2kit 3.x is expected, found " + v[0] + "." + v[1] + "." + v[2];
+					if (v >= [5, 0, 0]) {
+						const mess = "a2kit 4.x is expected, found " + v[0] + "." + v[1] + "." + v[2];
 						vscode.window.showErrorMessage(mess);
 						out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
 					}
-					if (v < [3, 0, 1]) {
-						const mess = "a2kit 3.0.1 is required, found " + v[0] + "." + v[1] + "." + v[2];
+					if (v < [4, 0, 0]) {
+						const mess = "a2kit 4.0.0 is required, found " + v[0] + "." + v[1] + "." + v[2];
 						vscode.window.showErrorMessage(mess);
 						out.items.push(vscode.NotebookCellOutputItem.text("ERROR: " + mess));
 					}
@@ -93,7 +92,7 @@ class DiskImageProvider implements vscode.NotebookSerializer {
 					vscode.window.showErrorMessage("error getting a2kit version: " + error.message);
 			}
 			try {
-				const root_dir = bin2txt(['dir'], Buffer.from(data));
+				const root_dir = bin2txt(['dir'], data, undefined, undefined);
 				out.items.push(vscode.NotebookCellOutputItem.text(root_dir));
 			} catch (error) {
 				out.items.push(vscode.NotebookCellOutputItem.text("could not solve file system, but track solutions may exist"));
@@ -133,10 +132,12 @@ export class DiskImageController {
 	vs_messager: vscode.NotebookRendererMessaging;
 	path_map = new Map<string, string>();
 	tree_map = new Map<string, util.Tree>();
-	data_map = new Map<string, Buffer>();
+	data_map = new Map<string, Uint8Array>();
 	geometry_map = new Map<string, mess_base.Geometry>();
 	stat_map = new Map<string, mess_base.Stat>();
 	stale_map = new Map<string, number>();
+	fmt_map = new Map<string, string>();
+	method_map = new Map<string, string>();
 	constructor() {
 		console.log("using backend " + serverCommand);
 		this.vs_controller = vscode.notebooks.createNotebookController('disk-image-id', 'disk-image-notebook', 'Disk Image', this.execute.bind(this));
@@ -209,83 +210,87 @@ export class DiskImageController {
 	/** get and return the secondary buffer, retrieving from the main hex string that
 	 * is stored in the notebook's metadata, if not already done
 	 */
-	updateData(img_hash: string, img_data: string): Buffer {
+	updateData(img_hash: string, img_data: string): Uint8Array {
 		let buf = this.data_map.get(img_hash);
 		if (buf)
 			return buf;
-		buf = Buffer.from(img_data, "hex");
+		buf = Uint8Array.from(Buffer.from(img_data, "hex"));
 		this.data_map.set(img_hash, buf);
 		return buf;
 	}
 	/** get and return the tree, retrieving from disk if not already done
 	 * @throws Error
 	 */
-	updateTree(img_hash: string, img_buf: Buffer): util.Tree {
+	updateTree(img_hash: string, img_buf: Uint8Array): util.Tree {
 		let tree = this.tree_map.get(img_hash);
+		let maybe_fmt = this.fmt_map.get(img_hash);
+		let maybe_method = this.method_map.get(img_hash);
 		if (tree)
 			return tree;
-		const json_str = bin2txt(["tree", "--meta"], img_buf);
-		tree = JSON.parse(json_str);
-		if (tree) {
-			this.tree_map.set(img_hash, tree);
-			return tree;
+		const json_str = bin2txt(["tree", "--meta"], img_buf, maybe_method, maybe_fmt);
+		try {
+			tree = JSON.parse(json_str);
+			if (tree) {
+				this.tree_map.set(img_hash, tree);
+				return tree;
+			}
+		} catch (e) {
+			throw e;
 		}
 		throw Error;
 	}
 	/** get and return the stats, retrieving from disk if not already done
 	 * @throws Error
 	 */
-	updateStatistics(img_hash: string, img_buf: Buffer): mess_base.Stat {
+	updateStatistics(img_hash: string, img_buf: Uint8Array): mess_base.Stat {
 		let stat = this.stat_map.get(img_hash);
 		if (stat)
 			return stat;
-		const json_str = bin2txt(["stat"], img_buf);
-		stat = JSON.parse(json_str);
-		if (stat) {
-			this.stat_map.set(img_hash, stat);
-			return stat;				
+		const json_str = bin2txt(["stat"], img_buf, this.method_map.get(img_hash), this.fmt_map.get(img_hash));
+		try {
+			stat = JSON.parse(json_str);
+			if (stat) {
+				this.stat_map.set(img_hash, stat);
+				return stat;				
+			}
+		} catch (e) {
+			throw e;
 		}
 		throw Error;
 	}
 	/** get and return the geometry, retrieving from disk if not already done
 	 * @throws Error
 	 */
-	updateGeometry(img_hash: string, img_buf: Buffer): mess_base.Geometry {
+	updateGeometry(img_hash: string, img_buf: Uint8Array): mess_base.Geometry {
 		let geo = this.geometry_map.get(img_hash);
 		if (geo)
 			return geo;
-		const json_str = bin2txt(["geometry"], img_buf);
-		geo = JSON.parse(json_str);
-		if (geo) {
-			this.geometry_map.set(img_hash, geo);
-			return geo;				
+		const json_str = bin2txt(["geometry"], img_buf, this.method_map.get(img_hash), this.fmt_map.get(img_hash));
+		try {
+			geo = JSON.parse(json_str);
+			if (geo) {
+				this.geometry_map.set(img_hash, geo);
+				return geo;				
+			}
+		} catch (e) {
+			throw e;
 		}
 		throw Error;
 	}
-	testNibbles(img_hash: string, img_buf: Buffer): boolean {
+	testNibbles(geo: mess_base.Geometry, img_hash: string, img_buf: Uint8Array): boolean {
+		let ch = "0,0";
+		for (const trk of geo.tracks) {
+			if (trk) {
+				ch = trk.cylinder.toString() + "," + trk.head.toString();
+				break;
+			}
+		}
 		try {
-			const res = bin2bin(["get", "-t", "track", "-f", "0,0"], img_buf);
+			const res = bin2bin(["get", "-t", "track", "-f", ch], img_buf, this.method_map.get(img_hash), this.fmt_map.get(img_hash));
 			return true;
 		} catch (err) {
 			return false;
 		}
-	}
-	findTrack(geo: mess_base.Geometry,cyl: number, head: number) : mess_base.Track | null {
-		for (const trk of geo.tracks) {
-			if (!trk)
-				return null;
-			if (trk.cylinder == cyl && trk.head == head) {
-				return trk
-			}
-		}
-		return null;
-	}
-	getNibDesc(geo: mess_base.Geometry,trk: mess_base.Track): nib.NibbleDesc {
-		if (trk.nibble_code == "5&3")
-			return nib.Std13;
-		if (trk.nibble_code == "6&2" && geo.package == "5.25")
-			return nib.Std16;
-		return nib.Std35;
 	}
 	private execute(cells: vscode.NotebookCell[], notebook: vscode.NotebookDocument, controller: vscode.NotebookController) {
 		const img_buf = this.updateData(notebook.metadata.img_hash, notebook.metadata.img_data);
@@ -294,20 +299,32 @@ export class DiskImageController {
 
 			execution.start(Date.now()); // Keep track of elapsed time to execute cell.
 
-			const lines = cell.document.getText().split(/\r?\n/);
-			let img_path = this.path_map.get(notebook.metadata.img_hash);
-			const out_cells = [];
+			const all_txt = cell.document.getText();
+			try {
+				const try_json: Object = JSON.parse(all_txt);
+				if (try_json && try_json.hasOwnProperty("a2kit_type")) {
+					this.fmt_map.set(notebook.metadata.img_hash, all_txt);
+					execution.replaceOutput([new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.text("JSON successfully parsed")])]);
+				} else {
+					execution.replaceOutput([new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.text("JSON parsed but not understood")])]);
+				}
+				execution.end(true, Date.now());
+			} catch (err) {
+				const lines = cell.document.getText().split(/\r?\n/);
+				let img_path = this.path_map.get(notebook.metadata.img_hash);
+				const out_cells = [];
 
-			for (const line of lines) {
-				out_cells.push(...this.parse_line(line, img_path, img_buf, notebook));
-			}
+				for (const line of lines) {
+					out_cells.push(...this.parse_line(line, img_path, img_buf, notebook));
+				}
 
-			const out_list = []
-			for (const cell of out_cells) {
-				out_list.push(new vscode.NotebookCellOutput([cell]));
+				const out_list = []
+				for (const cell of out_cells) {
+					out_list.push(new vscode.NotebookCellOutput([cell]));
+				}
+				execution.replaceOutput(out_list);
+				execution.end(true, Date.now());
 			}
-			execution.replaceOutput(out_list);
-			execution.end(true, Date.now());
 		}
 	}
 }

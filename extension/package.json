@@ -2,22 +2,22 @@
 	"name": "vscode-disk-image-extension",
 	"displayName": "Disk Image Extension",
 	"description": "Look inside disk images",
-	"version": "4.0.0",
+	"version": "5.0.0",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
 		"url": "https://github.com/dfgordon/vscode-disk-image-notebook"
 	},
 	"engines": {
-		"vscode": "^1.85.0"
+		"vscode": "^1.99.0"
 	},
 	"type": "commonjs",
 	"devDependencies": {
 		"@types/mocha": "^10.0.4",
-		"@types/node": "20.x",
-		"@types/vscode": "^1.85.0",
+		"@types/node": "24.x",
+		"@types/vscode": "^1.99.0",
         "glob": "^11.0.0",
-		"mocha": "^10.7.3",
-		"typescript": "^5.5.4"
+		"mocha": "^11.7.1",
+		"typescript": "^5.9.2"
 	}
 }

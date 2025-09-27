@@ -59,6 +59,13 @@ export type ThemeRadioProps = {
     callback: (event: Event) => void
 };
 
+export type MultiStateButtonProps = {
+    numStates: number,
+    states: string[],
+    theme: theme.ThemeColors,
+    callback: (state: number) => void
+};
+
 export function ThemeRadio(props: ThemeRadioProps) {
     const css = {};
     if (props.state == 'on') {
@@ -107,6 +114,30 @@ export function ThemeButton(props: ThemeButtonProps) {
     return html`<button style=${css} onClick=${props.callback}>${props.name}</a>`;
 }
 
+export function MultiStateButton(props: MultiStateButtonProps) {
+    const state = useSignal(0);
+    const css = {
+        border: props.theme.buttonBorder,
+        'background-color': props.theme.buttonBackground,
+        color: props.theme.buttonForeground,
+        'text-decoration': 'none',
+        padding: '2px 8px',
+        width: '30px',
+        height: stdHeight,
+        'box-sizing': 'border-box',
+        cursor: 'pointer'
+    };
+    function next(event: Event) {
+        if (state.value + 1 == props.numStates) {
+            state.value = 0;
+        } else {
+            state.value += 1;
+        }
+        props.callback(state.value);
+    }
+    return html`<button style=${css} onClick=${next}>${props.states[state.value]}</a>`;
+}
+
 export function ThemeRepButton(props: ThemeButtonProps) {
     const css = {
         border: props.theme.buttonBorder,
@@ -137,7 +168,7 @@ export function ThemeRepButton(props: ThemeButtonProps) {
 
 export type ThemeLabelProps = {
     name: string,
-    theme: theme.ThemeColors,
+    theme: theme.ThemeColors
 }
 
 export function ThemeLabel(props: ThemeLabelProps) {
@@ -153,7 +184,13 @@ export function ThemeLabel(props: ThemeLabelProps) {
     return html`<button style=${css}>${props.name}</label>`;
 }
 
-export function ThemeIntLabel(props: ThemeLabelProps) {
+export type ThemeindicatorProps = {
+    name: string,
+    theme: theme.ThemeColors,
+    maxChars: number // if 0 fit text to box
+}
+
+export function ThemeIndicator(props: ThemeindicatorProps) {
     const css = {
         border: props.theme.radioOffBorder,
         'background-color': props.theme.radioOffBackground,
@@ -161,8 +198,10 @@ export function ThemeIntLabel(props: ThemeLabelProps) {
         'text-decoration': 'none',
         padding: '2px 8px',
         'font-size': '17px',
+        width: props.maxChars==0 ? 'none' : (20+props.maxChars*10).toString()+'px',
         height: stdHeight,
         'box-sizing': 'border-box',
+        'text-align': 'end',
         'vertical-align': 'bottom'
     };
     return html`<button style=${css}>${props.name}</label>`;
@@ -241,6 +280,61 @@ export function IntRangeSelector(props: IntRangeSelectorProps) {
     `
 }
 
+export type MotorRangeSelectorProps = {
+    name: string,
+    coarseRange: [number, number],
+    fineRange: [number, number] | null,
+    theme: theme.ThemeColors,
+    callback: (coarse: number,fine: number) => void
+}
+
+export function MotorRangeSelector(props: MotorRangeSelectorProps) {
+    const coarse = useSignal(props.coarseRange[0]);
+    const fine = useSignal(props.fineRange ? props.fineRange[0] : 0);
+    useSignalEffect(() => {
+        const constrained = constrainWithRange(props.coarseRange, coarse.value);
+        if (typeof constrained == 'number') {
+            coarse.value = constrained;
+        }
+        props.callback(coarse.value,fine.value);
+    });
+    function onBeg(event: Event) {
+        coarse.value = props.coarseRange[0];
+        fine.value = props.fineRange ? props.fineRange[0] : 0;
+    }
+    function onEnd(event: Event) {
+        coarse.value = props.coarseRange[1] - 1;
+        fine.value = props.fineRange ? props.fineRange[0] : 0;
+    }
+    function onDec(event: Event) {
+        if (coarse.value > props.coarseRange[0]) {
+            coarse.value -= 1;
+        }
+    }
+    function onInc(event: Event) {
+        if (coarse.value < props.coarseRange[1] - 1) {
+            coarse.value += 1;
+        }
+    }
+    function onSet(event: Event) {
+        if (event.target instanceof HTMLInputElement) {
+            coarse.value = parseInt(event.target.value);
+        }
+    }
+    function onIncFine(state: number) {
+        fine.value = state;
+    }
+    return html`
+        ${ThemeLabel({ name: props.name, theme: props.theme })}
+        ${ThemeButton({ name: "|<", theme: props.theme, callback: onBeg})}
+        ${ThemeRepButton({ name: "<", theme: props.theme, callback: onDec })}
+        ${ThemeInt({ name: coarse.value.toString(), min: props.coarseRange[0], max: props.coarseRange[1] - 1, theme: props.theme, callback: onSet })}
+        ${props.fineRange ? MultiStateButton({ numStates: 4, states: ["+","+","+","+"], theme: props.theme, callback: onIncFine }) : html``}
+        ${ThemeRepButton({ name: ">", theme: props.theme, callback: onInc})}
+        ${ThemeButton({ name: ">|", theme: props.theme, callback: onEnd})}
+    `
+}
+
 export type IntMapSelectorProps = {
     name: string,
     ikey: Signal<number>,
@@ -281,6 +375,9 @@ export function IntMapSelector(props: IntMapSelectorProps) {
                     const rev = new Array<number>(...props.validList.value).reverse();
                     [newKey, newVal] = [rev.length - 1 - rev.findIndex((x) => x == max), max];
                     break;
+                } else if (newKey == null && oldVal == min && min == max) {
+                    [newKey, newVal] = [props.validList.value.length - 1, max];
+                    break;
                 }
                 i = props.validList.value.length - 1;
             }
@@ -309,6 +406,9 @@ export function IntMapSelector(props: IntMapSelectorProps) {
             if (i >= props.validList.value.length) {
                 if (newKey == null && oldVal == max && min != max) {
                     [newKey, newVal] = [props.validList.value.findIndex((x) => x == min), min];
+                    break;
+                } else if (newKey == null && oldVal == max && min == max) {
+                    [newKey, newVal] = [0, min];
                     break;
                 }
                 i = 0;

@@ -39,12 +39,26 @@ const MSDosMap = new Map<string, string>([
  *
  * @param args the a2kit arguments 
  * @param stdin the optional binary data that is piped in
+ * @param method the decoding methodology "auto", "fast", "analyze", "emulate"
+ * @param fmt JSON string defining format of tracks
  * @throws Error
  */
-export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
+export function bin2bin(args0: string[], stdin: Uint8Array | undefined, method: string | undefined, fmt: string | undefined) : Uint8Array {
 	let res: SpawnSyncReturns<Buffer>;
 	if (!serverCommand) {
 		throw new Error("unable to find backend");
+	}
+	const args = [];
+	for (const arg of args0) {
+		args.push(arg);
+	}
+	if (fmt) {
+		args.push("--pro");
+		args.push(fmt);
+	}
+	if (method) {
+		args.push("--method");
+		args.push(method);
 	}
 	if (stdin)
 		res = spawnSync(serverCommand, args, { timeout: 10000, input: stdin, windowsHide: true, maxBuffer: 32*1024*1024 });
@@ -55,7 +69,7 @@ export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
 	} else if ((res.status != 0 || res.error) && !res.stderr) {
 		throw new Error(`error spawning a2kit (is it installed and in the path?)`);
 	}
-	return res.stdout;
+	return Uint8Array.from(res.stdout);
 }
 
 /**
@@ -63,12 +77,26 @@ export function bin2bin(args: string[], stdin: Buffer | undefined) : Buffer {
  *
  * @param args the a2kit arguments 
  * @param stdin the optional binary data that is piped in
+ * @param method the decoding methodology "auto", "fast", "analyze", "emulate"
+ * @param fmt JSON string defining format of tracks
  * @throws Error
  */
-export function bin2txt(args: string[], stdin: Buffer | undefined) : string {
+export function bin2txt(args0: string[], stdin: Uint8Array | undefined, method: string | undefined, fmt: string | undefined) : string {
 	let res: SpawnSyncReturns<Buffer>;
 	if (!serverCommand) {
 		throw new Error("unable to find backend");
+	}
+	const args = [];
+	for (const arg of args0) {
+		args.push(arg);
+	}
+	if (fmt) {
+		args.push("--pro");
+		args.push(fmt);
+	}
+	if (method) {
+		args.push("--method");
+		args.push(method);
 	}
 	if (stdin)
 		res = spawnSync(serverCommand, args, { timeout: 10000, input: stdin, windowsHide: true, maxBuffer: 32*1024*1024 });
@@ -90,10 +118,12 @@ interface FileImageType {
 	fs_type: string;
 	aux: string;
 	access: string;
+	accessed: string,
 	created: string;
 	modified: string;
 	version: string;
 	min_version: string;
+	full_path: string,
 	chunks: {[Key: string]: string};
 }
 
@@ -103,8 +133,10 @@ export class FileImage {
 		this.img = JSON.parse(json_str);
 	}
 	verify(): boolean {
-		if (this.img.fimg_version.slice(0, 2) != "2.")
+		const vers = this.img.fimg_version.split(".").map((s) => parseInt(s));
+		if (vers < [2, 1, 0] || vers >= [3, 0, 0]) {
 			return false;
+		}
 		return true;
 	}
 	block0(): number[] | undefined {
@@ -180,55 +212,55 @@ export class FileImage {
 	 * @returns [maybe object code, string for display]
 	 * @throws Error
 	 * */
-	getText(path: string, stdin: Buffer): [ObjectCode | null, string] {
+	getText(path: string, stdin: Uint8Array, method: string | undefined, fmt: string | undefined): [ObjectCode | null, string] {
 		const typ = this.getBestType();
 		if (typ == "txt") {
 			if (this.img.file_system == "prodos" && this.img.aux != "0000") {
-				return [null, bin2txt(["get", "-f", path, "-t", "rec", "--indent", "4"], stdin)];
+				return [null, bin2txt(["get", "-f", path, "-t", "rec", "--indent", "4"], stdin, method, fmt)];
 			}
 			if ((this.img.file_system == "prodos" || this.img.file_system == "a2 dos") && path.endsWith(".S")) {
 				try {
-					const tokens = bin2bin(["get", "-f", path, "-t", "mtok"], stdin);
-					return [null, bin2txt(["detokenize", "-t", "mtok"], tokens)];
+					const tokens = bin2bin(["get", "-f", path, "-t", "mtok"], stdin, method, fmt);
+					return [null, bin2txt(["detokenize", "-t", "mtok"], tokens, undefined, undefined)];
 				} catch {
 					console.log("attempt to interpret .S as Merlin failed");
 				}
 			}
-			return [null, bin2txt(["get", "-f", path, "-t", typ], stdin)];
+			return [null, bin2txt(["get", "-f", path, "-t", typ], stdin, method, fmt)];
 		} else if (typ == "atok" || typ == "itok") {
-			const tokens = bin2bin(["get", "-f", path, "-t", typ], stdin);
-			return [null, bin2txt(["detokenize", "-t", typ], tokens)];
+			const tokens = bin2bin(["get", "-f", path, "-t", typ], stdin, method, fmt);
+			return [null, bin2txt(["detokenize", "-t", typ], tokens, undefined, undefined)];
 		} else {
 			const baseAddr = this.getLoadAddr();
-			const dat = bin2bin(["get", "-f", path, "-t", typ], stdin);
+			const dat = bin2bin(["get", "-f", path, "-t", typ], stdin, method, fmt);
+			const hex = bin2txt(["get", "-f", path, "-t", typ, "--console"], stdin, method, fmt);
 			if (baseAddr == 0) {
-				const tentative_string = dat.toString('utf8');
+				// convert to unicode and see if we have 0xFFFD (replacement character), if not treat as text
+				const tentative_string = Buffer.from(dat).toString();
 				if (!tentative_string.includes('\ufffd'))
 					return [null, tentative_string];
 			}
 			const objCode = new ObjectCode(baseAddr, dat);
-			return [objCode, hexDump(dat, baseAddr)];
+			return [objCode, hex];
 		}
 	}
 	/** Get a hex dump
 	 * @throws Error
 	 * */
-	getHex(path: string, stdin: Buffer, raw: boolean): string {
+	getHex(path: string, stdin: Uint8Array, raw: boolean, method: string | undefined, fmt: string | undefined): string {
 		const baseAddr = this.getLoadAddr();
 		if (raw) {
-			const dat = bin2bin(["get", "-f", path, "-t", "raw", "--trunc"], stdin);
-			return hexDump(dat, baseAddr);
+			return bin2txt(["get", "-f", path, "-t", "raw", "--trunc", "--console"], stdin, method, fmt);
 		} else {
-			const dat = bin2bin(["get", "-f", path, "-t", "bin"], stdin);
-			return hexDump(dat, baseAddr);
+			return bin2txt(["get", "-f", path, "-t", "bin", "--console"], stdin, method, fmt);
 		}
 	}
 	/** Get ObjectCode type using fimg and disk both
 	 * @throws Error
 	 * */
-	getObjectCode(path: string, stdin: Buffer): ObjectCode {
+	getObjectCode(path: string, stdin: Uint8Array, method: string | undefined, fmt: string | undefined): ObjectCode {
 		const baseAddr = this.getLoadAddr();
-		const dat = bin2bin(["get", "-f", path, "-t", "bin"], stdin);
+		const dat = bin2bin(["get", "-f", path, "-t", "bin"], stdin, method, fmt);
 		return new ObjectCode(baseAddr, dat);
 	}
 }
