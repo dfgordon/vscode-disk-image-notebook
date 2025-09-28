@@ -2,7 +2,7 @@
 	"name": "vscode-disk-image-extension",
 	"displayName": "Disk Image Extension",
 	"description": "Look inside disk images",
-	"version": "5.0.0",
+	"version": "5.0.1",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {

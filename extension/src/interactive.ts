@@ -41,7 +41,7 @@ export function create_interactive(this: DiskImageController, notebook: vscode.N
     } catch (Error) {
         console.log("could not determine disk geometry");
     }
-    if (geometry == null || geometry.tracks == null) {
+    if (stat == null && (geometry == null || geometry.tracks == null)) {
         out_cells.push(vscode.NotebookCellOutputItem.text("Disk geometry could not be determined"));
         out_cells.push(vscode.NotebookCellOutputItem.text("You may still be able to view tracks in a code cell"));
     } else {

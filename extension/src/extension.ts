@@ -277,7 +277,10 @@ export class DiskImageController {
 		}
 		throw Error;
 	}
-	testNibbles(geo: mess_base.Geometry, img_hash: string, img_buf: Uint8Array): boolean {
+	testNibbles(geo: mess_base.Geometry | null, img_hash: string, img_buf: Uint8Array): boolean {
+		if (geo == null) {
+			return false;
+		}
 		let ch = "0,0";
 		for (const trk of geo.tracks) {
 			if (trk) {

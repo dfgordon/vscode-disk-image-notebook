@@ -1,7 +1,7 @@
 {
 	"name": "disk-image-interactive",
 	"description": "notebook renderer for disk images",
-	"version": "5.0.0",
+	"version": "5.0.1",
 	"license": "GPL-3.0-only",
 	"publisher": "dfgordon",
 	"repository": {
